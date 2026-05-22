@@ -1,0 +1,53 @@
+[project]
+name = "utools-main"
+version = "0.1.0"
+description = "FastAPI and Vue admin application"
+readme = "README.md"
+requires-python = ">=3.14,<3.15"
+dependencies = [
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.34.0",
+    "pydantic>=2.10.0",
+    "pydantic-settings>=2.7.0",
+    "tortoise-orm>=0.23.0",
+    "asyncpg>=0.30.0",
+    "aerich>=0.8.0",
+    "aiosqlite>=0.20.0",
+    "pyjwt>=2.10.0",
+    "argon2-cffi>=23.1.0",
+    "python-multipart>=0.0.20",
+    "python-dotenv>=1.0.0",
+    "loguru>=0.7.0",
+    "httpx>=0.28.0",
+]
+
+[dependency-groups]
+dev = [
+    "black>=24.10.0",
+    "isort>=5.13.0",
+    "playwright>=1.56.0",
+    "ruff>=0.9.0",
+]
+
+[tool.black]
+line-length = 120
+target-version = ["py314"]
+
+[tool.isort]
+profile = "black"
+line_length = 120
+
+[tool.ruff]
+line-length = 120
+target-version = "py314"
+
+[tool.ruff.lint]
+ignore = [
+    "F403",
+    "F405",
+]
+
+[tool.aerich]
+tortoise_orm = "app.core.config.TORTOISE_ORM"
+location = "./migrations"
+src_folder = "./."
