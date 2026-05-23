@@ -42,6 +42,14 @@ https://utools-main.onrender.com/health/db
 {"code":200,"msg":"OK","data":{"status":"ok","database":"ok"}}
 ```
 
+仓库已配置 GitHub Actions 自动保活：
+
+```text
+.github/workflows/keep-awake.yml
+```
+
+它会每 4 天访问一次 `/health/db`，也可以在 GitHub Actions 页面手动运行。
+
 不要把数据库密码、`SECRET_KEY`、Cloudflare Token、Render Token 写进代码、README 或提交记录。
 
 ## 本地运行
@@ -307,6 +315,7 @@ playwright e2e ok
 - 改了前端环境变量但没变化：必须重新 `corepack pnpm build`，再重新 `wrangler.cmd pages deploy ...`。
 - Render 免费后端休眠：先访问 `https://utools-main.onrender.com/health` 手动唤醒。
 - Supabase 数据库疑似休眠：先访问 `https://utools-main.onrender.com/health/db`，它会真实执行一次 `SELECT 1`。
+- 自动保活失败：到 GitHub 仓库的 Actions 页面，手动运行 `Keep Awake`。
 - Render 报 `No open ports detected`：通常是应用启动失败，先看上方 Python traceback。
 - Render 报数据库证书错误：确认 `DATABASE_URL` 使用 `sslmode=verify-full`，并配置了完整的 `DATABASE_SSL_ROOT_CERT`。
 - Render 报密码认证失败：检查数据库密码是否 URL 编码。
