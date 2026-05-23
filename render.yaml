@@ -8,12 +8,14 @@ services:
     healthCheckPath: /health
     envVars:
       - key: PYTHON_VERSION
-        value: 3.14.3
+        value: 3.14.5
       - key: JWT_ACCESS_TOKEN_EXPIRE_MINUTES
         value: "10080"
       - key: SECRET_KEY
         generateValue: true
       - key: DATABASE_URL
+        sync: false
+      - key: DATABASE_SSL_ROOT_CERT
         sync: false
       - key: CORS_ORIGINS
         sync: false

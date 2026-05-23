@@ -71,6 +71,25 @@ uv run python tests/e2e_login_role_playwright.py --screenshot-dir test-results/s
 
 Render 不是传统 VPS，通常不需要 SSH 到服务器执行 `git pull`。第一次在 Render 控制台连接 GitHub 仓库并配置环境变量后，后续只要推送 `main` 分支，Render 会自动部署。
 
+### 0. 最短可执行流程
+
+第一次部署按这个顺序执行：
+
+```text
+1. 推送代码到 GitHub
+2. 在 Render 创建 Web Service，Root Directory 留空
+3. 填 Build Command / Start Command / Health Check Path
+4. 在 Render 填 DATABASE_URL、DATABASE_SSL_ROOT_CERT、SECRET_KEY、CORS_ORIGINS
+5. Manual Deploy -> Clear build cache & deploy
+6. 访问 /health 验证
+```
+
+当前后端线上地址：
+
+```text
+https://utools-main.onrender.com
+```
+
 ### 1. GitHub 仓库
 
 先把代码推到 GitHub：
@@ -125,6 +144,18 @@ PYTHON_VERSION=3.14.5
 
 `SECRET_KEY` 必须是生产随机值，不要提交到代码或文档。
 
+如果前端还没有线上域名，`CORS_ORIGINS` 可以先填本地开发地址：
+
+```text
+["http://localhost:5173","http://127.0.0.1:5173"]
+```
+
+前端上线后再改成真实前端域名，例如：
+
+```text
+["https://你的前端域名"]
+```
+
 ### 4. Supabase Pooler 连接串
 
 连接串格式：
@@ -160,6 +191,8 @@ ssl.SSLCertVerificationError: certificate verify failed
 ```text
 Supabase Project -> Database -> Settings -> SSL Configuration
 ```
+
+Supabase 官方文档推荐从项目控制台下载 CA 证书。不要依赖非官方固定下载链接，因为证书和下载路径可能随项目区域、连接方式或 Supabase 更新而变化。
 
 也可以从 Pooler TLS 握手抓取证书链。以下脚本不会登录数据库，不需要数据库密码，只读取服务端证书链：
 
@@ -218,6 +251,8 @@ cert-2.pem: Supabase Intermediate CA
 cert-3.pem: Supabase Root CA
 ```
 
+本项目已经验证过：Render + Python 3.14.5 + Supabase Pooler 使用 `cert-3.pem` 写入 `DATABASE_SSL_ROOT_CERT` 后可以启动成功。
+
 ### 6. Render CLI
 
 Render CLI 可用于查看服务、日志、触发部署和更新环境变量。安装示例：
@@ -247,6 +282,13 @@ C:\tmp\render-cli\cli_v2.18.0.exe services --output json
 C:\tmp\render-cli\cli_v2.18.0.exe logs --resources <service_id> --limit 120 --output text
 ```
 
+从 `services --output json` 输出中取：
+
+```text
+service.id          -> <service_id>
+service.serviceDetails.url -> 后端 URL
+```
+
 触发部署：
 
 ```powershell
@@ -265,7 +307,7 @@ from pathlib import Path
 
 import httpx
 
-service_id = "srv-d88g2sel51nc73fes46g"
+service_id = "<service_id>"
 cert_path = Path("C:/tmp/supabase-certs/cert-3.pem")
 
 cfg = Path.home().joinpath(".render", "cli.yaml").read_text(encoding="utf-8")
@@ -297,7 +339,7 @@ with httpx.Client(base_url="https://api.render.com/v1", headers=headers, timeout
 写入后触发部署：
 
 ```powershell
-C:\tmp\render-cli\cli_v2.18.0.exe deploys create srv-d88g2sel51nc73fes46g --confirm
+C:\tmp\render-cli\cli_v2.18.0.exe deploys create <service_id> --confirm
 ```
 
 ### 8. 验证部署
@@ -322,6 +364,8 @@ uv run python -c "import httpx; r=httpx.get('https://utools-main.onrender.com/he
 {"code":200,"msg":"OK","data":{"status":"ok"}}
 ```
 
+访问根路径 `/` 返回 `404 Not Found` 是正常的，因为当前后端只提供 API 和 `/health`，没有后端首页。
+
 ### 9. 常见错误
 
 端口错误：
@@ -343,6 +387,8 @@ ssl.SSLCertVerificationError: certificate verify failed
 - `DATABASE_URL` 是否使用 `sslmode=verify-full`
 - 是否配置 `DATABASE_SSL_ROOT_CERT`
 - 证书内容是否完整包含 `BEGIN CERTIFICATE` 和 `END CERTIFICATE`
+- 如果是在 Render 页面手动粘贴证书，确认多行内容没有丢失换行
+- 如果使用 API 写入证书，确认脚本中的 `<service_id>` 已替换为真实服务 ID
 
 Python 3.14 严格证书扩展错误：
 
@@ -351,6 +397,35 @@ CA cert does not include key usage extension
 ```
 
 项目代码已处理该兼容问题：保留证书链和主机名校验，只关闭 Python SSL 的 `VERIFY_X509_STRICT` 扩展检查。
+
+数据库密码解析错误：
+
+```text
+password authentication failed
+```
+
+检查 `DATABASE_URL` 里的密码是否做了 URL 编码。常见字符：
+
+```text
+@ -> %40
+# -> %23
+% -> %25
+空格 -> %20
+```
+
+构建命令错误：
+
+```text
+ModuleNotFoundError
+```
+
+检查 `Build Command` 是否是：
+
+```text
+uv sync --frozen --no-dev
+```
+
+不要改成 `pip install -r requirements.txt`。本项目依赖以 `pyproject.toml` 和 `uv.lock` 为准。
 
 如果前端作为独立 Static Site 部署，前端环境变量需要设置：
 
