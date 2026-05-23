@@ -699,8 +699,10 @@ dependencies = [
 dev = [
     { name = "black" },
     { name = "isort" },
-    { name = "playwright" },
     { name = "ruff" },
+]
+e2e = [
+    { name = "playwright" },
 ]
 
 [package.metadata]
@@ -725,9 +727,9 @@ requires-dist = [
 dev = [
     { name = "black", specifier = ">=24.10.0" },
     { name = "isort", specifier = ">=5.13.0" },
-    { name = "playwright", specifier = ">=1.56.0" },
     { name = "ruff", specifier = ">=0.9.0" },
 ]
+e2e = [{ name = "playwright", specifier = ">=1.56.0" }]
 
 [[package]]
 name = "uvicorn"
