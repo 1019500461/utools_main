@@ -1,4 +1,5 @@
 from functools import cached_property
+import ssl
 from urllib.parse import parse_qs, unquote, urlparse
 
 from pydantic import Field
@@ -10,6 +11,7 @@ class Settings(BaseSettings):
 
     app_title: str = "utools-main"
     database_url: str = Field(default="", alias="DATABASE_URL")
+    database_ssl_root_cert: str = Field(default="", alias="DATABASE_SSL_ROOT_CERT")
     secret_key: str = Field(default="change-me-in-env", alias="SECRET_KEY")
     jwt_algorithm: str = "HS256"
     jwt_access_token_expire_minutes: int = Field(default=60 * 24 * 7, alias="JWT_ACCESS_TOKEN_EXPIRE_MINUTES")
@@ -35,7 +37,7 @@ class Settings(BaseSettings):
 
         parsed = urlparse(self.database_url)
         query = parse_qs(parsed.query)
-        ssl_enabled = query.get("ssl", ["false"])[0].lower() in {"1", "true", "yes", "require"}
+        ssl_mode = query.get("sslmode", query.get("ssl", ["false"]))[0].lower()
         return {
             "engine": "tortoise.backends.asyncpg",
             "credentials": {
@@ -44,9 +46,21 @@ class Settings(BaseSettings):
                 "user": unquote(parsed.username or ""),
                 "password": unquote(parsed.password or ""),
                 "database": parsed.path.lstrip("/") or "postgres",
-                "ssl": ssl_enabled,
+                "ssl": self._build_ssl_context(ssl_mode),
             },
         }
+
+    def _build_ssl_context(self, ssl_mode: str) -> ssl.SSLContext | bool:
+        if ssl_mode not in {"1", "true", "yes", "require", "verify-ca", "verify-full"}:
+            return False
+
+        context = ssl.create_default_context()
+        root_cert = self.database_ssl_root_cert.strip().replace("\\n", "\n")
+        if root_cert:
+            context.load_verify_locations(cadata=root_cert)
+        if ssl_mode == "verify-ca":
+            context.check_hostname = False
+        return context
 
 
 settings = Settings()
