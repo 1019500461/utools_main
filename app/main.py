@@ -1,7 +1,8 @@
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from tortoise import connections
 
 from app.common.responses import success
 from app.core.config import settings
@@ -32,3 +33,13 @@ app.include_router(role_router)
 @app.get("/health")
 async def health():
     return success({"status": "ok"})
+
+
+@app.get("/health/db")
+async def health_db():
+    try:
+        connection = connections.get("default")
+        await connection.execute_query("SELECT 1")
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail="database unavailable") from exc
+    return success({"status": "ok", "database": "ok"})
