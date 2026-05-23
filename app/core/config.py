@@ -58,6 +58,8 @@ class Settings(BaseSettings):
         root_cert = self.database_ssl_root_cert.strip().replace("\\n", "\n")
         if root_cert:
             context.load_verify_locations(cadata=root_cert)
+        if hasattr(ssl, "VERIFY_X509_STRICT"):
+            context.verify_flags &= ~ssl.VERIFY_X509_STRICT
         if ssl_mode == "verify-ca":
             context.check_hostname = False
         return context
