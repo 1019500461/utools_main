@@ -1,12 +1,26 @@
 .env
+.env.*
+!.env.example
 .venv/
 __pycache__/
 *.py[cod]
 .ruff_cache/
+.mypy_cache/
+.pytest_cache/
+.coverage
+htmlcov/
 
 web/node_modules/
 web/dist/
 web/.pnpm-store/
+web/*.log
 
 test-results/
 playwright-report/
+.playwright/
+
+*.log
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
