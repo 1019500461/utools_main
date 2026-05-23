@@ -1,6 +1,6 @@
 # 项目约束
 
-完成修改后，需使用本地 Python 环境中的 Playwright 执行校验，确保相关功能可正常运行。
+完成修改后，需使用本地的 Python 环境中【非本项目下的虚拟环境】的 Playwright 执行校验，确保相关功能可正常运行。
 ython Playwright 的 to_have_url 用字符串或 re.compile，不要用 lambda。
 Naive UI 弹窗和页面常有重复 placeholder，测试定位要限定到 dialog/table 等作用域。
 Mock API 解析查询参数要 URL decode，尤其是中文角色名。
