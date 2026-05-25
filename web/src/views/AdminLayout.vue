@@ -36,6 +36,10 @@ const menuOptions = [
     label: () => h(RouterLink, { to: '/system/role' }, { default: () => '角色管理' }),
     key: '/system/role',
   },
+  {
+    label: () => h(RouterLink, { to: '/fund/etf' }, { default: () => '基金/ETF 监控' }),
+    key: '/fund/etf',
+  },
 ]
 
 function handleMenuSelect(key: string) {

@@ -24,6 +24,16 @@ export const router = createRouter({
         },
       ],
     },
+    {
+      path: '/fund',
+      component: () => import('./views/AdminLayout.vue'),
+      children: [
+        {
+          path: 'etf',
+          component: () => import('./views/EtfMonitorView.vue'),
+        },
+      ],
+    },
   ],
 })
 

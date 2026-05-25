@@ -36,6 +36,70 @@ export interface ApiRecord {
   unique_id: string
 }
 
+export type EtfTimeRange = '3y' | '5y' | 'all'
+
+export interface EtfMonitorRecord {
+  code: string
+  name: string
+  monitor?: boolean
+  is_active: boolean
+  time_range: EtfTimeRange
+  x_drop: number
+  y_step: number
+  current_stage: number
+  current_price?: number | null
+  change_percent?: number | null
+  peak_price?: number | null
+  retract?: number | null
+  current_retract?: number | null
+  range_warning?: string | null
+  range_notice?: string | null
+}
+
+export interface EtfKlineRecord {
+  date: string
+  open: number
+  close: number
+  high: number
+  low: number
+}
+
+export interface EtfMinuteRecord {
+  time: string
+  price: number
+  volume?: number | null
+}
+
+export interface EtfFundamentalInfo {
+  aum?: string | null
+  valuation?: string | null
+  holdings?: Array<{ name: string; percent?: string | number | null }>
+}
+
+export interface EtfDetailRecord {
+  code: string
+  name: string
+  monitor?: boolean
+  is_active?: boolean
+  time_range: EtfTimeRange
+  x_drop: number
+  y_step: number
+  current_stage: number
+  current_price?: number | null
+  peak_price?: number | null
+  trigger_price?: number | null
+  retract?: number | null
+  current_retract?: number | null
+  range_warning?: string | null
+  range_notice?: string | null
+  kline?: EtfKlineRecord[]
+  klines: EtfKlineRecord[]
+  intraday?: EtfMinuteRecord[]
+  minutes: EtfMinuteRecord[]
+  fundamental?: EtfFundamentalInfo | null
+  fundamentals?: EtfFundamentalInfo | null
+}
+
 export const api = {
   login: (data: { username: string; password: string }) =>
     http.post<unknown, ApiResponse<{ access_token: string; username: string }>>('/base/access_token', data),
@@ -54,4 +118,20 @@ export const api = {
     }),
   updateRoleAuthorized: (data: { id: number; menu_ids: number[]; api_infos: Array<{ path: string; method: string }> }) =>
     http.post<unknown, ApiResponse>('/role/authorized', data),
+  getEtfList: () => http.get<unknown, ApiResponse<EtfMonitorRecord[]>>('/etf/list'),
+  createEtf: (data: { code: string; name?: string; time_range: EtfTimeRange; x_drop: number; y_step: number }) =>
+    http.post<unknown, ApiResponse<EtfMonitorRecord>>('/etf/create', data),
+  updateEtf: (data: {
+    code: string
+    name?: string
+    is_active?: boolean
+    monitor?: boolean
+    time_range?: EtfTimeRange
+    x_drop?: number
+    y_step?: number
+  }) => http.post<unknown, ApiResponse<EtfMonitorRecord>>('/etf/update', data),
+  deleteEtf: (params: { code: string }) => http.delete<unknown, ApiResponse>('/etf/delete', { params }),
+  getEtfDetail: (params: { code: string }) => http.get<unknown, ApiResponse<EtfDetailRecord>>('/etf/detail', { params }),
+  syncEtf: (data: { code?: string } = {}) => http.post<unknown, ApiResponse<{ synced: number; message?: string }>>('/etf/sync', data),
+  runEtfMonitor: () => http.post<unknown, ApiResponse<{ checked: number; alerted?: number }>>('/etf/monitor/run'),
 }
