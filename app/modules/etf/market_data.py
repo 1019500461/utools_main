@@ -214,9 +214,9 @@ async def fetch_qfq_history(code: str, start_date: date, end_date: date) -> list
     }
 
     try:
-        payload = await _fetch_eastmoney_json((EASTMONEY_HISTORY_URL, EASTMONEY_HISTORY_FALLBACK_URL), params)
-    except MarketDataError:
         return await fetch_tencent_qfq_history(normalized, start_date, end_date)
+    except MarketDataError:
+        payload = await _fetch_eastmoney_json((EASTMONEY_HISTORY_URL, EASTMONEY_HISTORY_FALLBACK_URL), params)
     data = payload.get("data")
     if not data:
         return []
@@ -250,9 +250,9 @@ async def fetch_realtime_quote(code: str) -> RealtimeQuote:
     }
 
     try:
-        payload = await _fetch_eastmoney_json((EASTMONEY_QUOTE_URL, EASTMONEY_QUOTE_FALLBACK_URL), params)
-    except MarketDataError:
         return await fetch_tencent_realtime_quote(normalized)
+    except MarketDataError:
+        payload = await _fetch_eastmoney_json((EASTMONEY_QUOTE_URL, EASTMONEY_QUOTE_FALLBACK_URL), params)
     data = payload.get("data")
     if not data:
         raise MarketDataError(f"未获取到实时行情: {normalized}")

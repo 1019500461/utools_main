@@ -248,12 +248,36 @@ async def serialize_monitor_snapshot(monitor: ETFMonitor) -> dict:
     }
 
 
+async def serialize_monitor_list_item(monitor: ETFMonitor) -> dict:
+    latest = await ETFHistory.filter(code=normalize_code(monitor.code)).order_by("-date").first()
+    current_price = latest.close if latest else None
+    retract_info = await calculate_retract(monitor.code, monitor.time_range, current_price) if current_price else {}
+    return {
+        "id": monitor.id,
+        "code": normalize_code(monitor.code),
+        "name": monitor.name,
+        "is_active": monitor.is_active,
+        "time_range": monitor.time_range,
+        "x_drop": monitor.x_drop,
+        "y_step": monitor.y_step,
+        "current_stage": monitor.current_stage,
+        "created_at": monitor.created_at.isoformat() if monitor.created_at else None,
+        "updated_at": monitor.updated_at.isoformat() if monitor.updated_at else None,
+        "last_checked_at": monitor.last_checked_at.isoformat() if monitor.last_checked_at else None,
+        "last_alert_at": monitor.last_alert_at.isoformat() if monitor.last_alert_at else None,
+        "current_price": current_price,
+        "peak_price": retract_info.get("peak_price"),
+        "current_retract": retract_info.get("retract"),
+        "range_notice": retract_info.get("message"),
+    }
+
+
 async def list_monitor_snapshots(active_only: bool = False) -> list[dict]:
     query = ETFMonitor.all()
     if active_only:
         query = query.filter(Q(is_active=True))
     monitors = await query.order_by("code")
-    return [await serialize_monitor_snapshot(monitor) for monitor in monitors]
+    return [await serialize_monitor_list_item(monitor) for monitor in monitors]
 
 
 async def get_monitor_or_none(code: str) -> ETFMonitor | None:
@@ -272,9 +296,6 @@ async def get_detail(code: str) -> dict:
         **snapshot,
         "trigger_price": trigger_price,
         "klines": await get_history_bars(monitor.code, monitor.time_range),
-        "minutes": [{"time": datetime.now().strftime("%H:%M"), "price": snapshot["current_price"]}]
-        if snapshot.get("current_price") is not None
-        else [],
         "fundamentals": {"aum": None, "valuation": None, "holdings": []},
     }
 
