@@ -9,6 +9,8 @@ import httpx
 
 EASTMONEY_HISTORY_URL = "https://push2his.eastmoney.com/api/qt/stock/kline/get"
 EASTMONEY_QUOTE_URL = "https://push2.eastmoney.com/api/qt/stock/get"
+EASTMONEY_HISTORY_FALLBACK_URL = "http://push2his.eastmoney.com/api/qt/stock/kline/get"
+EASTMONEY_QUOTE_FALLBACK_URL = "http://push2.eastmoney.com/api/qt/stock/get"
 REQUEST_TIMEOUT_SECONDS = 8.0
 EASTMONEY_HEADERS = {
     "Accept": "application/json, text/plain, */*",
@@ -86,21 +88,22 @@ def _eastmoney_scaled_number(data: dict[str, Any], field: str) -> float | None:
     return float(value) / 100
 
 
-async def _fetch_eastmoney_json(url: str, params: dict[str, str]) -> dict[str, Any]:
+async def _fetch_eastmoney_json(urls: tuple[str, ...], params: dict[str, str]) -> dict[str, Any]:
     last_error: Exception | None = None
-    for _ in range(2):
-        try:
-            async with httpx.AsyncClient(
-                timeout=REQUEST_TIMEOUT_SECONDS,
-                headers=EASTMONEY_HEADERS,
-                follow_redirects=True,
-                trust_env=False,
-            ) as client:
-                response = await client.get(url, params=params)
-                response.raise_for_status()
-                return response.json()
-        except (httpx.HTTPError, ValueError) as exc:
-            last_error = exc
+    for url in urls:
+        for _ in range(2):
+            try:
+                async with httpx.AsyncClient(
+                    timeout=REQUEST_TIMEOUT_SECONDS,
+                    headers=EASTMONEY_HEADERS,
+                    follow_redirects=True,
+                    trust_env=False,
+                ) as client:
+                    response = await client.get(url, params=params)
+                    response.raise_for_status()
+                    return response.json()
+            except (httpx.HTTPError, ValueError) as exc:
+                last_error = exc
     raise MarketDataError(f"东方财富接口请求失败: {last_error}") from last_error
 
 
@@ -116,7 +119,7 @@ async def fetch_qfq_history(code: str, start_date: date, end_date: date) -> list
         "fields2": "f51,f52,f53,f54,f55",
     }
 
-    payload = await _fetch_eastmoney_json(EASTMONEY_HISTORY_URL, params)
+    payload = await _fetch_eastmoney_json((EASTMONEY_HISTORY_URL, EASTMONEY_HISTORY_FALLBACK_URL), params)
     data = payload.get("data")
     if not data:
         return []
@@ -149,7 +152,7 @@ async def fetch_realtime_quote(code: str) -> RealtimeQuote:
         "fields": "f43,f44,f45,f46,f58,f59,f60,f170,f292",
     }
 
-    payload = await _fetch_eastmoney_json(EASTMONEY_QUOTE_URL, params)
+    payload = await _fetch_eastmoney_json((EASTMONEY_QUOTE_URL, EASTMONEY_QUOTE_FALLBACK_URL), params)
     data = payload.get("data")
     if not data:
         raise MarketDataError(f"未获取到实时行情: {normalized}")
