@@ -3,7 +3,7 @@
     <div class="mb-5 flex flex-wrap items-center justify-between gap-3">
       <div>
         <h1 class="text-xl font-semibold text-slate-900">基金/ETF 监控</h1>
-        <p class="mt-1 text-sm text-slate-500">列表仅展示关键行情，进入详情后设置回撤提醒。</p>
+        <p class="mt-1 text-sm text-slate-500">列表展示关键行情，进入详情后设置回撤提醒。</p>
       </div>
       <div class="flex flex-wrap items-center gap-2">
         <n-button :loading="syncingAll" @click="syncAll">手动同步</n-button>
@@ -43,7 +43,7 @@
 
     <n-modal v-model:show="detailVisible" preset="card" :title="detailTitle" class="max-w-6xl">
       <n-spin :show="detailLoading">
-        <n-tabs v-model:value="activeTab" type="line" animated>
+        <n-tabs type="line" animated>
           <n-tab-pane name="drawdown" tab="回撤提醒设置">
             <div class="grid gap-5 lg:grid-cols-[260px_1fr]">
               <aside class="border-r border-slate-100 pr-4">
@@ -107,12 +107,6 @@
               </div>
             </div>
           </n-tab-pane>
-
-          <n-tab-pane name="history" tab="历史行情">
-            <n-card size="small" :bordered="false">
-              <div ref="historyKlineRef" class="h-96 w-full"></div>
-            </n-card>
-          </n-tab-pane>
         </n-tabs>
       </n-spin>
     </n-modal>
@@ -121,7 +115,7 @@
 
 <script setup lang="ts">
 import * as echarts from 'echarts'
-import { computed, defineComponent, h, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
+import { computed, defineComponent, h, nextTick, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import {
   NAlert,
   NButton,
@@ -170,13 +164,10 @@ const records = ref<EtfMonitorRecord[]>([])
 const createVisible = ref(false)
 const detailVisible = ref(false)
 const detailLoading = ref(false)
-const activeTab = ref('drawdown')
 const detail = ref<EtfDetailRecord | null>(null)
 const createFormRef = ref<FormInst | null>(null)
 const klineRef = ref<HTMLDivElement | null>(null)
-const historyKlineRef = ref<HTMLDivElement | null>(null)
 let klineChart: echarts.ECharts | null = null
-let historyKlineChart: echarts.ECharts | null = null
 
 const createForm = reactive({
   code: '',
@@ -206,6 +197,7 @@ const detailTitle = computed(() => {
 
 const columns: DataTableColumns<EtfMonitorRecord> = [
   { title: '编码', key: 'code', width: 140, render: (row) => h('span', { class: 'font-medium text-slate-900' }, row.code) },
+  { title: '基金名称', key: 'name', minWidth: 180, render: (row) => row.name || '-' },
   { title: '当前价格', key: 'current_price', width: 140, render: (row) => formatPrice(row.current_price) },
   {
     title: '今日涨跌幅',
@@ -249,11 +241,6 @@ onMounted(() => {
 onBeforeUnmount(() => {
   window.removeEventListener('resize', resizeCharts)
   disposeCharts()
-})
-
-watch(activeTab, async () => {
-  await nextTick()
-  renderCharts()
 })
 
 async function loadList() {
@@ -304,7 +291,6 @@ async function syncAll() {
 async function openDetail(row: EtfMonitorRecord) {
   detailVisible.value = true
   detailLoading.value = true
-  activeTab.value = 'drawdown'
   detail.value = null
   disposeCharts()
   try {
@@ -312,7 +298,7 @@ async function openDetail(row: EtfMonitorRecord) {
     detail.value = res.data
     fillDetailForm(res.data)
     await nextTick()
-    renderCharts()
+    renderKlineChart(res.data)
   } finally {
     detailLoading.value = false
   }
@@ -347,25 +333,15 @@ async function saveDetailSettings() {
     fillDetailForm(res.data)
     await loadList()
     await nextTick()
-    renderCharts()
+    renderKlineChart(res.data)
   } finally {
     savingDetail.value = false
   }
 }
 
-function renderCharts() {
-  if (!detail.value) return
-  if (activeTab.value === 'drawdown') {
-    renderKlineChart(klineRef.value, detail.value, 'drawdown')
-  }
-  if (activeTab.value === 'history') {
-    renderKlineChart(historyKlineRef.value, detail.value, 'history')
-  }
-}
-
-function renderKlineChart(container: HTMLDivElement | null, data: EtfDetailRecord, chartName: 'drawdown' | 'history') {
-  if (!container) return
-  const chart = chartName === 'drawdown' ? (klineChart ||= echarts.init(container)) : (historyKlineChart ||= echarts.init(container))
+function renderKlineChart(data: EtfDetailRecord) {
+  if (!klineRef.value) return
+  klineChart ||= echarts.init(klineRef.value)
   const kline = data.kline || data.klines || []
   const markData = []
   if (typeof data.peak_price === 'number') {
@@ -374,7 +350,7 @@ function renderKlineChart(container: HTMLDivElement | null, data: EtfDetailRecor
   if (typeof data.trigger_price === 'number') {
     markData.push({ name: 'Trigger', yAxis: data.trigger_price, lineStyle: { color: '#16a34a', width: 1.5 } })
   }
-  chart.setOption({
+  klineChart.setOption({
     animation: false,
     grid: { left: 48, right: 28, top: 24, bottom: 42 },
     tooltip: { trigger: 'axis' },
@@ -394,14 +370,11 @@ function renderKlineChart(container: HTMLDivElement | null, data: EtfDetailRecor
 
 function resizeCharts() {
   klineChart?.resize()
-  historyKlineChart?.resize()
 }
 
 function disposeCharts() {
   klineChart?.dispose()
-  historyKlineChart?.dispose()
   klineChart = null
-  historyKlineChart = null
 }
 
 function getRetract(row?: EtfMonitorRecord | EtfDetailRecord | null) {
