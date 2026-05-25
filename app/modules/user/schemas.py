@@ -10,3 +10,7 @@ class TokenOut(BaseModel):
     access_token: str
     token_type: str = "bearer"
     username: str
+
+
+class ProfileUpdateSchema(BaseModel):
+    email: str = Field(min_length=3, max_length=255)

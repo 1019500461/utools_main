@@ -1,6 +1,8 @@
 from datetime import datetime
+from email.utils import parseaddr
 
 from fastapi import APIRouter, Depends, HTTPException
+from tortoise.exceptions import IntegrityError
 
 from app.common.dependencies import get_current_user
 from app.common.responses import success
@@ -8,7 +10,7 @@ from app.core.security import create_access_token, verify_password
 from app.modules.role.models import Api, Menu
 from app.modules.role.service import serialize_role, serialize_menu
 from app.modules.user.models import User
-from app.modules.user.schemas import CredentialsSchema, TokenOut
+from app.modules.user.schemas import CredentialsSchema, ProfileUpdateSchema, TokenOut
 
 router = APIRouter(prefix="/api/v1/base", tags=["base"])
 
@@ -42,6 +44,30 @@ async def get_userinfo(current_user: User = Depends(get_current_user)):
             "is_active": current_user.is_active,
             "is_superuser": current_user.is_superuser,
             "roles": [await serialize_role(role) for role in roles],
+        }
+    )
+
+
+@router.post("/profile")
+async def update_profile(payload: ProfileUpdateSchema, current_user: User = Depends(get_current_user)):
+    email = payload.email.strip()
+    parsed_name, parsed_email = parseaddr(email)
+    if parsed_name or parsed_email.lower() != email.lower() or "@" not in parsed_email:
+        raise HTTPException(status_code=400, detail="邮箱格式不正确")
+
+    current_user.email = email
+    try:
+        await current_user.save(update_fields=["email", "updated_at"])
+    except IntegrityError as exc:
+        raise HTTPException(status_code=400, detail="邮箱已被占用") from exc
+
+    return success(
+        {
+            "id": current_user.id,
+            "username": current_user.username,
+            "email": current_user.email,
+            "is_active": current_user.is_active,
+            "is_superuser": current_user.is_superuser,
         }
     )
 

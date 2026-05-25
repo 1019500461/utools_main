@@ -9,6 +9,14 @@ export interface ApiResponse<T = unknown> {
   page_size?: number
 }
 
+export interface UserInfo {
+  id?: number
+  username: string
+  email: string
+  is_active?: boolean
+  is_superuser?: boolean
+}
+
 export interface RoleRecord {
   id: number
   name: string
@@ -103,7 +111,8 @@ export interface EtfDetailRecord {
 export const api = {
   login: (data: { username: string; password: string }) =>
     http.post<unknown, ApiResponse<{ access_token: string; username: string }>>('/base/access_token', data),
-  getUserInfo: () => http.get<unknown, ApiResponse<{ username: string }>>('/base/userinfo'),
+  getUserInfo: () => http.get<unknown, ApiResponse<UserInfo>>('/base/userinfo'),
+  updateProfile: (data: { email: string }) => http.post<unknown, ApiResponse<UserInfo>>('/base/profile', data),
   getRoleList: (params: { page: number; page_size: number; role_name?: string }) =>
     http.get<unknown, ApiResponse<RoleRecord[]>>('/role/list', { params }),
   createRole: (data: { name: string; desc: string }) => http.post<unknown, ApiResponse<RoleRecord>>('/role/create', data),

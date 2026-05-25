@@ -40,6 +40,10 @@ const menuOptions = [
     label: () => h(RouterLink, { to: '/fund/etf' }, { default: () => '基金/ETF 监控' }),
     key: '/fund/etf',
   },
+  {
+    label: () => h(RouterLink, { to: '/account/profile' }, { default: () => '个人中心' }),
+    key: '/account/profile',
+  },
 ]
 
 function handleMenuSelect(key: string) {

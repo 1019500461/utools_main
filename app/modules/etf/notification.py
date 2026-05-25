@@ -6,6 +6,7 @@ import smtplib
 from email.message import EmailMessage
 
 from app.core.config import settings
+from app.modules.user.models import User
 
 
 def build_strategy_email(code: str, stage: int, price: float, retract: float) -> tuple[str, str]:
@@ -47,14 +48,21 @@ def build_strategy_email(code: str, stage: int, price: float, retract: float) ->
     return subject, body
 
 
-def _send_email(subject: str, body: str) -> None:
-    if not all([settings.smtp_host, settings.smtp_from, settings.smtp_to]):
-        raise RuntimeError("SMTP_HOST, SMTP_FROM and SMTP_TO are required for email notification.")
+async def _resolve_recipient_email() -> str:
+    user = await User.filter(is_active=True, is_superuser=True).exclude(email="").order_by("id").first()
+    if not user:
+        user = await User.filter(is_active=True).exclude(email="").order_by("id").first()
+    return user.email if user and user.email else settings.smtp_to
+
+
+def _send_email(subject: str, body: str, recipient: str) -> None:
+    if not all([settings.smtp_host, settings.smtp_from, recipient]):
+        raise RuntimeError("SMTP_HOST, SMTP_FROM and recipient email are required for email notification.")
 
     message = EmailMessage()
     message["Subject"] = subject
     message["From"] = settings.smtp_from
-    message["To"] = settings.smtp_to
+    message["To"] = recipient
     message.set_content("观察点到达提示，请使用支持 HTML 的客户端查看。")
     message.add_alternative(body, subtype="html")
 
@@ -73,4 +81,5 @@ def _send_email(subject: str, body: str) -> None:
 
 async def send_strategy_notification(code: str, stage: int, price: float, retract: float) -> None:
     subject, body = build_strategy_email(code, stage, price, retract)
-    await asyncio.to_thread(_send_email, subject, body)
+    recipient = await _resolve_recipient_email()
+    await asyncio.to_thread(_send_email, subject, body, recipient)

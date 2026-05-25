@@ -7,7 +7,7 @@ export const router = createRouter({
   routes: [
     {
       path: '/',
-      redirect: '/system/role',
+      redirect: '/fund/etf',
     },
     {
       path: '/login',
@@ -21,6 +21,16 @@ export const router = createRouter({
         {
           path: 'role',
           component: () => import('./views/RoleManageView.vue'),
+        },
+      ],
+    },
+    {
+      path: '/account',
+      component: () => import('./views/AdminLayout.vue'),
+      children: [
+        {
+          path: 'profile',
+          component: () => import('./views/ProfileView.vue'),
         },
       ],
     },
@@ -43,7 +53,7 @@ router.beforeEach((to) => {
     return { path: '/login', query: { redirect: to.fullPath } }
   }
   if (to.path === '/login' && auth.token) {
-    return '/system/role'
+    return '/fund/etf'
   }
   return true
 })
