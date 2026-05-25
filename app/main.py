@@ -7,6 +7,8 @@ from tortoise import connections
 from app.common.responses import success
 from app.core.config import settings
 from app.db.session import close_database, init_database
+from app.modules.etf.api import router as etf_router
+from app.modules.etf.monitor import start_scheduler, stop_scheduler
 from app.modules.role.api import router as role_router
 from app.modules.user.api import router as user_router
 
@@ -14,7 +16,9 @@ from app.modules.user.api import router as user_router
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     await init_database()
+    start_scheduler()
     yield
+    await stop_scheduler()
     await close_database()
 
 
@@ -28,6 +32,7 @@ app.add_middleware(
 )
 app.include_router(user_router)
 app.include_router(role_router)
+app.include_router(etf_router)
 
 
 @app.get("/health")

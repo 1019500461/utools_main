@@ -25,12 +25,64 @@ def wait_for_backend(api_url: str, timeout: int) -> None:
     raise TimeoutError(f"Backend is not ready: {health_url}")
 
 
+def mock_etf_code() -> str:
+    letters = "".join(chr(65 + (byte % 26)) for byte in uuid4().bytes[:8])
+    return f"MOCK{letters}"
+
+
+def run_etf_smoke(client: httpx.Client, headers: dict[str, str]) -> None:
+    code = mock_etf_code()
+    created = assert_ok(
+        client.post(
+            "/etf/create",
+            json={
+                "code": code,
+                "name": "ETF smoke",
+                "time_range": "3y",
+                "x_drop": 0.15,
+                "y_step": 0.05,
+                "is_active": True,
+            },
+            headers=headers,
+        )
+    )
+    assert created["data"]["monitor"]["code"] == code, created
+    assert created["data"]["sync"] is None or "error" in created["data"]["sync"], created
+
+    listed = assert_ok(client.get("/etf/list", headers=headers))
+    assert any(item["code"] == code for item in listed["data"]), listed
+
+    detail = assert_ok(client.get("/etf/detail", params={"code": code}, headers=headers))
+    assert detail["data"]["code"] == code, detail
+    assert "klines" in detail["data"], detail
+
+    updated = assert_ok(
+        client.post(
+            "/etf/update",
+            json={"code": code, "name": "ETF smoke updated", "time_range": "5y", "is_active": True},
+            headers=headers,
+        )
+    )
+    assert updated["data"]["name"] == "ETF smoke updated", updated
+    assert updated["data"]["time_range"] == "5y", updated
+
+    synced = assert_ok(client.post("/etf/sync", json={"code": code}, headers=headers))
+    assert synced["data"] and synced["data"][0]["code"] == code, synced
+    assert "error" in synced["data"][0], synced
+
+    monitored = assert_ok(client.post("/etf/monitor/run", json={"code": code}, headers=headers))
+    assert monitored["data"] and monitored["data"][0]["code"] == code, monitored
+
+    assert_ok(client.delete("/etf/delete", params={"code": code}, headers=headers))
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Smoke test login and role management APIs.")
     parser.add_argument("--api-url", default="http://127.0.0.1:8000/api/v1")
     parser.add_argument("--username", default="admin")
     parser.add_argument("--password", default="123456")
     parser.add_argument("--timeout", type=int, default=30)
+    parser.add_argument("--skip-etf", action="store_true", help="Skip ETF API smoke checks.")
     args = parser.parse_args()
 
     wait_for_backend(args.api_url, args.timeout)
@@ -67,6 +119,9 @@ def main() -> None:
         assert authorized["menus"], authorized
 
         assert_ok(client.delete("/role/delete", params={"role_id": role_id}, headers=headers))
+
+        if not args.skip_etf:
+            run_etf_smoke(client, headers)
 
     print("api smoke ok")
 

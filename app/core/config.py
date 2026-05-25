@@ -16,6 +16,13 @@ class Settings(BaseSettings):
     jwt_algorithm: str = "HS256"
     jwt_access_token_expire_minutes: int = Field(default=60 * 24 * 7, alias="JWT_ACCESS_TOKEN_EXPIRE_MINUTES")
     cors_origins: list[str] = Field(default=["http://localhost:5173", "http://127.0.0.1:5173"], alias="CORS_ORIGINS")
+    smtp_host: str = Field(default="", alias="SMTP_HOST")
+    smtp_port: int = Field(default=587, alias="SMTP_PORT")
+    smtp_user: str = Field(default="", alias="SMTP_USER")
+    smtp_password: str = Field(default="", alias="SMTP_PASSWORD")
+    smtp_from: str = Field(default="", alias="SMTP_FROM")
+    smtp_to: str = Field(default="", alias="SMTP_TO")
+    smtp_tls: bool = Field(default=True, alias="SMTP_TLS")
 
     @cached_property
     def tortoise_orm(self) -> dict:
@@ -23,7 +30,7 @@ class Settings(BaseSettings):
             "connections": {"default": self._build_database_config()},
             "apps": {
                 "models": {
-                    "models": ["app.modules.user.models", "app.modules.role.models"],
+                    "models": ["app.modules.user.models", "app.modules.role.models", "app.modules.etf.models"],
                     "default_connection": "default",
                 }
             },
