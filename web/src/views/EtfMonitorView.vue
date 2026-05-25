@@ -3,7 +3,7 @@
     <div class="mb-5 flex flex-wrap items-center justify-between gap-3">
       <div>
         <h1 class="text-xl font-semibold text-slate-900">基金/ETF 监控</h1>
-        <p class="mt-1 text-sm text-slate-500">管理监控标的，查看历史 K 线和触发价格。</p>
+        <p class="mt-1 text-sm text-slate-500">列表仅展示关键行情，进入详情后设置回撤提醒。</p>
       </div>
       <div class="flex flex-wrap items-center gap-2">
         <n-button :loading="syncingAll" @click="syncAll">手动同步</n-button>
@@ -17,63 +17,103 @@
         :data="records"
         :loading="loading"
         :row-key="(row) => row.code"
-        :row-props="rowProps"
         :pagination="{ pageSize: 12 }"
       />
     </n-card>
 
-    <n-modal v-model:show="formVisible" preset="card" :title="formTitle" class="max-w-xl">
-      <n-form ref="formRef" :model="form" label-placement="left" :label-width="96">
+    <n-modal v-model:show="createVisible" preset="card" title="新增标的" class="max-w-xl">
+      <n-form ref="createFormRef" :model="createForm" label-placement="left" :label-width="96">
         <n-form-item label="代码" path="code" :rule="{ required: true, message: '请输入代码' }">
-          <n-input v-model:value="form.code" :disabled="formMode === 'edit'" placeholder="例如 510300" />
+          <n-input v-model:value="createForm.code" placeholder="例如 510300" />
         </n-form-item>
         <n-form-item label="名称" path="name">
-          <n-input v-model:value="form.name" placeholder="可选" />
+          <n-input v-model:value="createForm.name" placeholder="可选" />
         </n-form-item>
         <n-form-item label="统计范围" path="time_range">
-          <n-select v-model:value="form.time_range" :options="timeRangeOptions" />
+          <n-select v-model:value="createForm.time_range" :options="timeRangeOptions" />
         </n-form-item>
-        <div class="grid gap-3 md:grid-cols-2">
-          <n-form-item label="回撤阈值" path="x_drop_percent">
-            <n-input-number v-model:value="form.x_drop_percent" :min="1" :max="95" :precision="2" class="w-full">
-              <template #suffix>%</template>
-            </n-input-number>
-          </n-form-item>
-          <n-form-item label="阶梯步长" path="y_step_percent">
-            <n-input-number v-model:value="form.y_step_percent" :min="1" :max="50" :precision="2" class="w-full">
-              <template #suffix>%</template>
-            </n-input-number>
-          </n-form-item>
-        </div>
       </n-form>
       <template #footer>
         <div class="flex justify-end gap-2">
-          <n-button @click="formVisible = false">取消</n-button>
-          <n-button type="primary" :loading="saving" @click="saveForm">保存</n-button>
+          <n-button @click="createVisible = false">取消</n-button>
+          <n-button type="primary" :loading="saving" @click="saveCreate">保存</n-button>
         </div>
       </template>
     </n-modal>
 
     <n-modal v-model:show="detailVisible" preset="card" :title="detailTitle" class="max-w-6xl">
       <n-spin :show="detailLoading">
-        <div class="grid gap-4 lg:grid-cols-[1fr_280px]">
-          <n-card size="small" title="历史 K 线" :bordered="false">
-            <div ref="klineRef" class="h-96 w-full" data-testid="etf-kline-chart"></div>
-          </n-card>
-          <div>
-            <n-card size="small" title="监控数据" :bordered="false">
-              <div class="space-y-3 text-sm">
-                <InfoRow label="当前价格" :value="formatPrice(detail?.current_price)" />
-                <InfoRow label="区间高点" :value="formatPrice(detail?.peak_price)" value-class="text-red-600" />
-                <InfoRow label="触发价格" :value="formatPrice(detail?.trigger_price)" value-class="text-emerald-600" />
-                <InfoRow label="当前回撤" :value="formatPercent(getRetract(detail))" />
-                <n-alert v-if="getRangeWarning(detail)" type="warning" :show-icon="false">
-                  {{ getRangeWarning(detail) }}
-                </n-alert>
+        <n-tabs v-model:value="activeTab" type="line" animated>
+          <n-tab-pane name="drawdown" tab="回撤提醒设置">
+            <div class="grid gap-5 lg:grid-cols-[260px_1fr]">
+              <aside class="border-r border-slate-100 pr-4">
+                <div class="space-y-2 text-sm text-slate-500">
+                  <p class="rounded bg-slate-100 px-3 py-2 font-medium text-slate-900">基金回撤提醒</p>
+                  <p class="px-3 py-2">趋势反转提醒</p>
+                  <p class="px-3 py-2">下跌抄底提醒</p>
+                  <p class="px-3 py-2">上涨分批止盈</p>
+                </div>
+              </aside>
+
+              <div class="space-y-5">
+                <div class="flex items-start justify-between gap-4">
+                  <div>
+                    <h2 class="text-lg font-semibold text-slate-900">基金回撤提醒</h2>
+                    <p class="mt-2 max-w-3xl text-sm leading-6 text-slate-500">
+                      以统计周期内的历史高点为锚，当前价格接近预设回撤阈值时提醒；后续每下跌一个阶梯步长再次提醒。
+                    </p>
+                  </div>
+                  <n-switch v-model:value="detailForm.is_active" />
+                </div>
+
+                <n-card size="small" title="历史 K 线" :bordered="false">
+                  <div ref="klineRef" class="h-80 w-full" data-testid="etf-kline-chart"></div>
+                </n-card>
+
+                <n-card size="small" title="参数设置" :bordered="false">
+                  <n-form :model="detailForm" label-placement="left" :label-width="104">
+                    <div class="grid gap-3 lg:grid-cols-3">
+                      <n-form-item label="统计周期">
+                        <n-select v-model:value="detailForm.time_range" :options="timeRangeOptions" />
+                      </n-form-item>
+                      <n-form-item label="回撤阈值">
+                        <n-input-number v-model:value="detailForm.x_drop_percent" :min="1" :max="95" :precision="2" class="w-full">
+                          <template #suffix>%</template>
+                        </n-input-number>
+                      </n-form-item>
+                      <n-form-item label="阶梯步长">
+                        <n-input-number v-model:value="detailForm.y_step_percent" :min="1" :max="50" :precision="2" class="w-full">
+                          <template #suffix>%</template>
+                        </n-input-number>
+                      </n-form-item>
+                    </div>
+                  </n-form>
+
+                  <div class="mt-2 grid gap-3 text-sm md:grid-cols-4">
+                    <InfoRow label="当前价格" :value="formatPrice(detail?.current_price)" />
+                    <InfoRow label="区间高点" :value="formatPrice(detail?.peak_price)" value-class="text-red-600" />
+                    <InfoRow label="触发价格" :value="formatPrice(detail?.trigger_price)" value-class="text-emerald-600" />
+                    <InfoRow label="当前回撤" :value="formatPercent(getRetract(detail))" />
+                  </div>
+
+                  <n-alert v-if="getRangeWarning(detail)" class="mt-3" type="warning" :show-icon="false">
+                    {{ getRangeWarning(detail) }}
+                  </n-alert>
+
+                  <div class="mt-5 flex justify-end">
+                    <n-button type="primary" :loading="savingDetail" @click="saveDetailSettings">保存</n-button>
+                  </div>
+                </n-card>
               </div>
+            </div>
+          </n-tab-pane>
+
+          <n-tab-pane name="history" tab="历史行情">
+            <n-card size="small" :bordered="false">
+              <div ref="historyKlineRef" class="h-96 w-full"></div>
             </n-card>
-          </div>
-        </div>
+          </n-tab-pane>
+        </n-tabs>
       </n-spin>
     </n-modal>
   </section>
@@ -81,7 +121,7 @@
 
 <script setup lang="ts">
 import * as echarts from 'echarts'
-import { computed, defineComponent, h, nextTick, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
+import { computed, defineComponent, h, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import {
   NAlert,
   NButton,
@@ -96,6 +136,9 @@ import {
   NSpace,
   NSpin,
   NSwitch,
+  NTabPane,
+  NTabs,
+  NTag,
   useMessage,
   type DataTableColumns,
   type FormInst,
@@ -111,9 +154,9 @@ const InfoRow = defineComponent({
   },
   setup(props) {
     return () =>
-      h('div', { class: 'flex justify-between gap-3' }, [
-        h('span', { class: 'text-slate-500' }, props.label),
-        h('span', { class: ['font-medium', props.valueClass] }, props.value),
+      h('div', { class: 'rounded bg-slate-50 px-3 py-2' }, [
+        h('p', { class: 'text-xs text-slate-500' }, props.label),
+        h('p', { class: ['mt-1 font-medium', props.valueClass] }, props.value),
       ])
   },
 })
@@ -121,21 +164,30 @@ const InfoRow = defineComponent({
 const message = useMessage()
 const loading = ref(false)
 const saving = ref(false)
+const savingDetail = ref(false)
 const syncingAll = ref(false)
-const syncingCodes = ref<string[]>([])
-const detailLoading = ref(false)
 const records = ref<EtfMonitorRecord[]>([])
-const formVisible = ref(false)
-const formMode = ref<'create' | 'edit'>('create')
+const createVisible = ref(false)
 const detailVisible = ref(false)
+const detailLoading = ref(false)
+const activeTab = ref('drawdown')
 const detail = ref<EtfDetailRecord | null>(null)
-const formRef = ref<FormInst | null>(null)
+const createFormRef = ref<FormInst | null>(null)
 const klineRef = ref<HTMLDivElement | null>(null)
+const historyKlineRef = ref<HTMLDivElement | null>(null)
 let klineChart: echarts.ECharts | null = null
+let historyKlineChart: echarts.ECharts | null = null
 
-const form = reactive({
+const createForm = reactive({
   code: '',
   name: '',
+  time_range: '3y' as EtfTimeRange,
+})
+
+const detailForm = reactive({
+  code: '',
+  name: '',
+  is_active: true,
   time_range: '3y' as EtfTimeRange,
   x_drop_percent: 15,
   y_step_percent: 5,
@@ -147,71 +199,29 @@ const timeRangeOptions = [
   { label: '成立以来', value: 'all' },
 ]
 
-const formTitle = computed(() => (formMode.value === 'create' ? '新增标的' : '编辑标的'))
 const detailTitle = computed(() => {
   if (!detail.value) return '标的详情'
   return `${detail.value.name || detail.value.code} ${detail.value.code}`
 })
+
 const columns: DataTableColumns<EtfMonitorRecord> = [
-  { title: '代码', key: 'code', width: 110, render: (row) => h('span', { class: 'font-medium text-slate-900' }, row.code) },
+  { title: '编码', key: 'code', width: 140, render: (row) => h('span', { class: 'font-medium text-slate-900' }, row.code) },
+  { title: '当前价格', key: 'current_price', width: 140, render: (row) => formatPrice(row.current_price) },
   {
-    title: '名称',
-    key: 'name',
-    minWidth: 160,
+    title: '今日涨跌幅',
+    key: 'change_percent',
+    width: 140,
     render(row) {
-      const warning = getRangeWarning(row)
-      return h('div', { class: 'space-y-1' }, [
-        h('div', { class: 'text-slate-900' }, row.name || '-'),
-        warning ? h('div', { class: 'text-xs text-amber-600' }, warning) : null,
-      ])
-    },
-  },
-  { title: '当前价格', key: 'current_price', width: 120, render: (row) => formatPrice(row.current_price) },
-  { title: '当前回撤', key: 'retract', width: 130, render: (row) => formatPercent(getRetract(row)) },
-  {
-    title: '监控',
-    key: 'monitor',
-    width: 100,
-    render(row) {
-      return h(NSwitch, {
-        value: isMonitoring(row),
-        onClick: (event: MouseEvent) => event.stopPropagation(),
-        'onUpdate:value': (value: boolean) => updateActive(row, value),
-      })
+      return h(NTag, { size: 'small', type: getChangeTagType(row.change_percent), bordered: false }, { default: () => formatPercent(row.change_percent) })
     },
   },
   {
     title: '操作',
     key: 'actions',
-    width: 240,
+    width: 120,
     render(row) {
       return h(NSpace, null, {
         default: () => [
-          h(
-            NButton,
-            {
-              size: 'small',
-              secondary: true,
-              loading: syncingCodes.value.includes(row.code),
-              onClick: (event: MouseEvent) => {
-                event.stopPropagation()
-                syncOne(row.code)
-              },
-            },
-            { default: () => '同步' }
-          ),
-          h(
-            NButton,
-            {
-              size: 'small',
-              secondary: true,
-              onClick: (event: MouseEvent) => {
-                event.stopPropagation()
-                openEdit(row)
-              },
-            },
-            { default: () => '编辑' }
-          ),
           h(
             NButton,
             {
@@ -241,6 +251,11 @@ onBeforeUnmount(() => {
   disposeCharts()
 })
 
+watch(activeTab, async () => {
+  await nextTick()
+  renderCharts()
+})
+
 async function loadList() {
   loading.value = true
   try {
@@ -251,65 +266,27 @@ async function loadList() {
   }
 }
 
-function rowProps(row: EtfMonitorRecord) {
-  return {
-    class: 'cursor-pointer',
-    onClick: () => openDetail(row),
-  }
-}
-
 function openCreate() {
-  formMode.value = 'create'
-  Object.assign(form, { code: '', name: '', time_range: '3y', x_drop_percent: 15, y_step_percent: 5 })
-  formVisible.value = true
+  Object.assign(createForm, { code: '', name: '', time_range: '3y' })
+  createVisible.value = true
 }
 
-function openEdit(row: EtfMonitorRecord) {
-  formMode.value = 'edit'
-  Object.assign(form, {
-    code: row.code,
-    name: row.name || '',
-    time_range: row.time_range,
-    x_drop_percent: ratioToPercent(row.x_drop),
-    y_step_percent: ratioToPercent(row.y_step),
-  })
-  formVisible.value = true
-}
-
-async function saveForm() {
-  await formRef.value?.validate()
+async function saveCreate() {
+  await createFormRef.value?.validate()
   saving.value = true
   try {
-    const payload = {
-      code: form.code.trim(),
-      name: form.name.trim() || undefined,
-      time_range: form.time_range,
-      x_drop: percentToRatio(form.x_drop_percent),
-      y_step: percentToRatio(form.y_step_percent),
-    }
-    if (formMode.value === 'create') {
-      await api.createEtf(payload)
-      message.success('新增成功')
-    } else {
-      await api.updateEtf(payload)
-      message.success('保存成功')
-    }
-    formVisible.value = false
+    await api.createEtf({
+      code: createForm.code.trim(),
+      name: createForm.name.trim() || undefined,
+      time_range: createForm.time_range,
+      x_drop: 0.15,
+      y_step: 0.05,
+    })
+    message.success('新增成功')
+    createVisible.value = false
     await loadList()
   } finally {
     saving.value = false
-  }
-}
-
-async function updateActive(row: EtfMonitorRecord, value: boolean) {
-  const previous = isMonitoring(row)
-  setMonitoring(row, value)
-  try {
-    await api.updateEtf({ code: row.code, is_active: value, monitor: value })
-    message.success(value ? '监控已开启' : '监控已关闭')
-  } catch (error) {
-    setMonitoring(row, previous)
-    throw error
   }
 }
 
@@ -324,35 +301,71 @@ async function syncAll() {
   }
 }
 
-async function syncOne(code: string) {
-  syncingCodes.value = [...syncingCodes.value, code]
-  try {
-    await api.syncEtf({ code })
-    message.success(`${code} 同步完成`)
-    await loadList()
-  } finally {
-    syncingCodes.value = syncingCodes.value.filter((item) => item !== code)
-  }
-}
-
 async function openDetail(row: EtfMonitorRecord) {
   detailVisible.value = true
   detailLoading.value = true
+  activeTab.value = 'drawdown'
   detail.value = null
   disposeCharts()
   try {
     const res = await api.getEtfDetail({ code: row.code })
     detail.value = res.data
+    fillDetailForm(res.data)
     await nextTick()
-    renderKlineChart(res.data)
+    renderCharts()
   } finally {
     detailLoading.value = false
   }
 }
 
-function renderKlineChart(data: EtfDetailRecord) {
-  if (!klineRef.value) return
-  klineChart ||= echarts.init(klineRef.value)
+function fillDetailForm(data: EtfDetailRecord) {
+  Object.assign(detailForm, {
+    code: data.code,
+    name: data.name || '',
+    is_active: data.is_active ?? data.monitor ?? true,
+    time_range: data.time_range,
+    x_drop_percent: ratioToPercent(data.x_drop),
+    y_step_percent: ratioToPercent(data.y_step),
+  })
+}
+
+async function saveDetailSettings() {
+  savingDetail.value = true
+  try {
+    await api.updateEtf({
+      code: detailForm.code,
+      name: detailForm.name || undefined,
+      is_active: detailForm.is_active,
+      monitor: detailForm.is_active,
+      time_range: detailForm.time_range,
+      x_drop: percentToRatio(detailForm.x_drop_percent),
+      y_step: percentToRatio(detailForm.y_step_percent),
+    })
+    message.success('保存成功')
+    const res = await api.getEtfDetail({ code: detailForm.code })
+    detail.value = res.data
+    fillDetailForm(res.data)
+    await loadList()
+    await nextTick()
+    renderCharts()
+  } finally {
+    savingDetail.value = false
+  }
+}
+
+function renderCharts() {
+  if (!detail.value) return
+  if (activeTab.value === 'drawdown') {
+    renderKlineChart(klineRef.value, detail.value, 'drawdown')
+  }
+  if (activeTab.value === 'history') {
+    renderKlineChart(historyKlineRef.value, detail.value, 'history')
+  }
+}
+
+function renderKlineChart(container: HTMLDivElement | null, data: EtfDetailRecord, chartName: 'drawdown' | 'history') {
+  if (!container) return
+  const chart = chartName === 'drawdown' ? (klineChart ||= echarts.init(container)) : (historyKlineChart ||= echarts.init(container))
   const kline = data.kline || data.klines || []
   const markData = []
   if (typeof data.peak_price === 'number') {
@@ -361,7 +374,7 @@ function renderKlineChart(data: EtfDetailRecord) {
   if (typeof data.trigger_price === 'number') {
     markData.push({ name: 'Trigger', yAxis: data.trigger_price, lineStyle: { color: '#16a34a', width: 1.5 } })
   }
-  klineChart.setOption({
+  chart.setOption({
     animation: false,
     grid: { left: 48, right: 28, top: 24, bottom: 42 },
     tooltip: { trigger: 'axis' },
@@ -381,20 +394,14 @@ function renderKlineChart(data: EtfDetailRecord) {
 
 function resizeCharts() {
   klineChart?.resize()
+  historyKlineChart?.resize()
 }
 
 function disposeCharts() {
   klineChart?.dispose()
+  historyKlineChart?.dispose()
   klineChart = null
-}
-
-function isMonitoring(row: EtfMonitorRecord) {
-  return typeof row.monitor === 'boolean' ? row.monitor : row.is_active
-}
-
-function setMonitoring(row: EtfMonitorRecord, value: boolean) {
-  row.monitor = value
-  row.is_active = value
+  historyKlineChart = null
 }
 
 function getRetract(row?: EtfMonitorRecord | EtfDetailRecord | null) {
@@ -419,5 +426,10 @@ function formatPrice(value?: number | null) {
 
 function formatPercent(value?: number | null) {
   return typeof value === 'number' ? `${(value * 100).toFixed(2)}%` : '-'
+}
+
+function getChangeTagType(value?: number | null) {
+  if (typeof value !== 'number' || value === 0) return 'default'
+  return value > 0 ? 'error' : 'success'
 }
 </script>

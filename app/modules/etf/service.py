@@ -249,8 +249,13 @@ async def serialize_monitor_snapshot(monitor: ETFMonitor) -> dict:
 
 
 async def serialize_monitor_list_item(monitor: ETFMonitor) -> dict:
-    latest = await ETFHistory.filter(code=normalize_code(monitor.code)).order_by("-date").first()
+    latest_bars = await ETFHistory.filter(code=normalize_code(monitor.code)).order_by("-date").limit(2)
+    latest = latest_bars[0] if latest_bars else None
+    previous = latest_bars[1] if len(latest_bars) > 1 else None
     current_price = latest.close if latest else None
+    change_percent = None
+    if latest and previous and previous.close:
+        change_percent = (latest.close - previous.close) / previous.close
     retract_info = await calculate_retract(monitor.code, monitor.time_range, current_price) if current_price else {}
     return {
         "id": monitor.id,
@@ -266,6 +271,7 @@ async def serialize_monitor_list_item(monitor: ETFMonitor) -> dict:
         "last_checked_at": monitor.last_checked_at.isoformat() if monitor.last_checked_at else None,
         "last_alert_at": monitor.last_alert_at.isoformat() if monitor.last_alert_at else None,
         "current_price": current_price,
+        "change_percent": change_percent,
         "peak_price": retract_info.get("peak_price"),
         "current_retract": retract_info.get("retract"),
         "range_notice": retract_info.get("message"),
