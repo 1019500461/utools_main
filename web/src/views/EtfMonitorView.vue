@@ -60,7 +60,7 @@
           <n-card size="small" title="历史 K 线" :bordered="false">
             <div ref="klineRef" class="h-96 w-full" data-testid="etf-kline-chart"></div>
           </n-card>
-          <div class="space-y-4">
+          <div>
             <n-card size="small" title="监控数据" :bordered="false">
               <div class="space-y-3 text-sm">
                 <InfoRow label="当前价格" :value="formatPrice(detail?.current_price)" />
@@ -70,22 +70,6 @@
                 <n-alert v-if="getRangeWarning(detail)" type="warning" :show-icon="false">
                   {{ getRangeWarning(detail) }}
                 </n-alert>
-              </div>
-            </n-card>
-            <n-card size="small" title="基本面" :bordered="false">
-              <div class="space-y-3 text-sm">
-                <InfoRow label="资产规模" :value="fundamental?.aum || '暂无数据'" />
-                <InfoRow label="最新估值" :value="fundamental?.valuation || '暂无数据'" />
-                <div>
-                  <p class="mb-2 text-slate-500">核心持仓</p>
-                  <div v-if="holdings.length" class="space-y-2">
-                    <div v-for="item in holdings" :key="item.name" class="flex justify-between gap-3">
-                      <span class="truncate text-slate-900">{{ item.name }}</span>
-                      <span class="shrink-0 text-slate-500">{{ item.percent ?? '-' }}</span>
-                    </div>
-                  </div>
-                  <n-empty v-else size="small" description="暂无数据" />
-                </div>
               </div>
             </n-card>
           </div>
@@ -103,7 +87,6 @@ import {
   NButton,
   NCard,
   NDataTable,
-  NEmpty,
   NForm,
   NFormItem,
   NInput,
@@ -169,9 +152,6 @@ const detailTitle = computed(() => {
   if (!detail.value) return '标的详情'
   return `${detail.value.name || detail.value.code} ${detail.value.code}`
 })
-const fundamental = computed(() => detail.value?.fundamental || detail.value?.fundamentals || null)
-const holdings = computed(() => fundamental.value?.holdings || [])
-
 const columns: DataTableColumns<EtfMonitorRecord> = [
   { title: '代码', key: 'code', width: 110, render: (row) => h('span', { class: 'font-medium text-slate-900' }, row.code) },
   {
