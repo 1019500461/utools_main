@@ -147,6 +147,25 @@ CORS_ORIGINS=["https://utools-main-web.pages.dev","http://localhost:5173","http:
 PYTHON_VERSION=3.14.5
 ```
 
+基金/ETF 观察提醒邮件需要额外配置发件 SMTP：
+
+```text
+SMTP_HOST=smtp.xxx.com
+SMTP_PORT=587
+SMTP_USER=your-sender@example.com
+SMTP_PASSWORD=邮箱 SMTP 授权码或密码
+SMTP_FROM=your-sender@example.com
+SMTP_TLS=true
+SMTP_TO=fallback-recipient@example.com
+```
+
+说明：
+
+- `SMTP_USER` / `SMTP_FROM` 是发件邮箱。
+- `SMTP_PASSWORD` 通常不是登录密码，而是邮箱服务商生成的 SMTP 授权码。
+- 页面「个人中心」填写的是接收通知邮箱。
+- `SMTP_TO` 只是兜底接收邮箱；当系统里没有可用用户邮箱时才会使用。
+
 数据库密码必须 URL 编码。常见字符：
 
 ```text
