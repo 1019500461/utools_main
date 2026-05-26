@@ -65,6 +65,12 @@ git commit -m "deploy"
 git push origin main
 ```
 
+在当前 Windows + Codex 环境里，Git 读写 `.git` 或读取 SSH 配置时可能需要提权。遇到下面情况，不要重新排查部署链路，直接用提权后的同一条 Git 命令重试：
+
+- `Unable to create '.git/index.lock': Permission denied`
+- `hostkeys_foreach failed ... known_hosts: Permission denied`
+- `Host key verification failed`
+
 推送 `main` 后：
 
 - Render 根据仓库根目录的 `render.yaml` 自动部署后端。
