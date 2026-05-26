@@ -77,6 +77,33 @@ git push origin main
 https://utools-main-web.pages.dev
 ```
 
+如果 GitHub 已经推送成功，但 Cloudflare Pages 线上页面没有更新，优先检查 Cloudflare Pages 的远程部署记录，而不是启动本地前端。
+
+Cloudflare 插件和 Wrangler 的关系：
+
+- Cloudflare 插件：Codex 通过 Cloudflare API 查询项目、触发部署、查看部署状态。
+- Wrangler：本机 Cloudflare CLI，主要用于手动直传 `web/dist` 或本机管理 Cloudflare 资源。
+- 日常 GitHub 集成部署只需要其中一个远程管理入口；当前推荐用 Cloudflare 插件或 API 排查，不把 Wrangler 作为主部署方式。
+
+Cloudflare 插件已授权时，让 Codex 查询或触发：
+
+```text
+GET /accounts/{account_id}/pages/projects/utools-main-web/deployments
+POST /accounts/{account_id}/pages/projects/utools-main-web/deployments
+```
+
+如果插件未授权，也可以在当前终端临时设置环境变量后用 API 触发一次远程构建。不要把 token 写进 README、代码或提交记录。
+
+```powershell
+$env:CLOUDFLARE_ACCOUNT_ID="your-account-id"
+$env:CLOUDFLARE_API_TOKEN="your-pages-write-token"
+
+Invoke-RestMethod `
+  -Method Post `
+  -Uri "https://api.cloudflare.com/client/v4/accounts/$env:CLOUDFLARE_ACCOUNT_ID/pages/projects/utools-main-web/deployments" `
+  -Headers @{ Authorization = "Bearer $env:CLOUDFLARE_API_TOKEN" }
+```
+
 不要把数据库密码、`SECRET_KEY`、Cloudflare Token、Render Token、Supabase 密钥写进代码、README 或提交记录。
 
 ## 1. 一次性平台配置
@@ -278,23 +305,3 @@ playwright e2e ok
 - Render 报 `No open ports detected`：通常是应用启动失败，先看上方 Python traceback。
 - Render 报数据库证书错误：确认 `DATABASE_URL` 使用 `sslmode=verify-full`，并配置了完整的 `DATABASE_SSL_ROOT_CERT`。
 - Render 报密码认证失败：检查数据库密码是否 URL 编码。
-
-## 4. 本地测试命令
-
-后端 API 冒烟测试：
-
-```powershell
-uv run python tests/api_smoke.py
-```
-
-本地浏览器 E2E：
-
-```powershell
-uv run --group e2e python tests/e2e_login_role_playwright.py --screenshot-dir test-results/screenshots
-```
-
-测试用例清单：
-
-```text
-tests/acceptance_cases.md
-```
