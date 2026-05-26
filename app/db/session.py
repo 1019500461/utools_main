@@ -20,8 +20,29 @@ ROLE_API_DEFINITIONS = [
 
 async def init_database() -> None:
     await Tortoise.init(config=settings.tortoise_orm)
+    connection = Tortoise.get_connection("default")
+    should_prepare_existing_etf_schema = False
+    if connection.capabilities.dialect == "postgres":
+        existing_table = await connection.execute_query_dict(
+            """
+            SELECT EXISTS (
+                SELECT 1
+                FROM information_schema.tables
+                WHERE table_schema = current_schema()
+                  AND table_name = 'etf_monitor'
+            ) AS exists;
+            """
+        )
+        should_prepare_existing_etf_schema = bool(existing_table[0]["exists"])
+
+    if should_prepare_existing_etf_schema:
+        await ensure_etf_schema()
+
     await Tortoise.generate_schemas(safe=True)
-    await ensure_etf_schema()
+
+    if not should_prepare_existing_etf_schema:
+        await ensure_etf_schema()
+
     await init_seed_data()
 
 
