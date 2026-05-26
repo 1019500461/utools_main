@@ -13,6 +13,7 @@ htmlcov/
 web/node_modules/
 web/dist/
 web/.pnpm-store/
+web/.wrangler/
 web/*.log
 
 test-results/

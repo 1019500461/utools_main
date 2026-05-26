@@ -52,54 +52,30 @@ https://utools-main.onrender.com/health/db
 
 不要把数据库密码、`SECRET_KEY`、Cloudflare Token、Render Token 写进代码、README 或提交记录。
 
-## 本地运行
-
-### 后端
-
-```powershell
-Copy-Item .env.example .env
-uv venv --python 3.14
-uv sync
-uv run python run.py
-```
-
-本地后端默认地址：
-
-```text
-http://127.0.0.1:8000
-```
-
-### 前端
-
-```powershell
-cd web
-corepack pnpm install
-corepack pnpm dev
-```
-
-本地前端默认地址：
-
-```text
-http://127.0.0.1:5173
-```
-
-开发环境下，Vite 会把 `/api` 代理到 `http://127.0.0.1:8000`。
-
 ## 生产部署
 
-当前项目已接入 GitHub、Render、Cloudflare Pages 和 Supabase。正常情况下，生产部署只需要：
+当前项目的生产部署走 GitHub 集成，不需要本机启动前端，也不需要本机 Wrangler 登录。
+
+在仓库根目录执行：
 
 ```powershell
+git status
 git add .
 git commit -m "deploy"
-git push
+git push origin main
 ```
 
 推送 `main` 后：
 
 - Render 根据仓库根目录的 `render.yaml` 自动部署后端。
-- Cloudflare Pages 根据 Git 集成自动构建并部署前端。
+- Cloudflare Pages 根据 Git 集成自动构建并部署前端，构建发生在 Cloudflare 环境里。
 - Supabase 作为外部 PostgreSQL 数据库，不随代码部署。
+
+部署完成后，直接访问：
+
+```text
+https://utools-main-web.pages.dev
+```
 
 不要把数据库密码、`SECRET_KEY`、Cloudflare Token、Render Token、Supabase 密钥写进代码、README 或提交记录。
 
@@ -194,7 +170,7 @@ Supabase Project -> Database -> Settings -> SSL Configuration
 
 ### 1.3 Cloudflare Pages 前端
 
-Cloudflare Pages 连接 GitHub 仓库后，配置：
+Cloudflare Pages 使用 GitHub 集成自动部署。项目配置：
 
 ```text
 Project name: utools-main-web
@@ -217,6 +193,13 @@ https://utools-main-web.pages.dev
 ```
 
 如果没有配置 `VITE_API_BASE_URL`，前端会打开，但登录和 API 请求会失败。
+
+说明：
+
+- 日常部署只需要 `git push origin main`。
+- 不需要在本机运行 `pnpm dev`。
+- 不需要在本机运行 `wrangler pages deploy`。
+- 只有在临时绕过 GitHub 集成、手动直传 `web/dist` 时，才需要本机 Wrangler 登录。
 
 ## 2. 线上验证
 
