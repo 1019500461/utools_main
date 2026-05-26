@@ -70,6 +70,13 @@ git push origin main
 - `Unable to create '.git/index.lock': Permission denied`
 - `hostkeys_foreach failed ... known_hosts: Permission denied`
 - `Host key verification failed`
+- `Connection reset ... port 22`
+
+如果 SSH 推送被重置，可以改用 HTTPS 远端推送同一个分支：
+
+```powershell
+git push https://github.com/1019500461/utools_main.git main
+```
 
 推送 `main` 后：
 
