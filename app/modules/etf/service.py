@@ -8,6 +8,7 @@ from tortoise.functions import Max
 
 from app.modules.etf.market_data import HistoryBar, RealtimeQuote, fetch_qfq_history, fetch_realtime_quote, normalize_code
 from app.modules.etf.models import ETFHistory, ETFMonitor
+from app.modules.user.models import User
 
 
 SUPPORTED_TIME_RANGES = {"3y", "5y", "all"}
@@ -133,8 +134,8 @@ async def sync_all_active_monitors() -> list[dict]:
     return results
 
 
-async def sync_monitors(code: str | None = None) -> list[dict]:
-    query = ETFMonitor.all().order_by("code")
+async def sync_monitors(user: User, code: str | None = None) -> list[dict]:
+    query = ETFMonitor.filter(user_id=user.id).order_by("code")
     if code:
         query = query.filter(code=normalize_code(code))
     monitors = await query
@@ -215,6 +216,42 @@ async def calculate_retract(code: str, time_range: str, current_price: float | N
     return {**peak_info, "current_price": current_price, "retract": retract}
 
 
+def build_position_metrics(monitor: ETFMonitor, current_price: float | None) -> dict:
+    holding_cost = monitor.holding_cost
+    holding_shares = monitor.holding_shares or 0
+    market_value = None
+    floating_profit = None
+    profit_rate = None
+    take_profit_rise = None
+    next_take_profit_rise = None
+
+    if isinstance(current_price, (int, float)) and holding_shares > 0:
+        market_value = current_price * holding_shares
+
+    if isinstance(current_price, (int, float)) and isinstance(holding_cost, (int, float)) and holding_cost > 0:
+        floating_profit = (current_price - holding_cost) * holding_shares
+        profit_rate = (current_price - holding_cost) / holding_cost
+        take_profit_rise = profit_rate
+        next_take_profit_rise = monitor.take_profit_first_rise + (monitor.take_profit_stage * monitor.take_profit_step)
+
+    return {
+        "holding_cost": holding_cost,
+        "holding_shares": holding_shares,
+        "market_value": market_value,
+        "floating_profit": floating_profit,
+        "profit_rate": profit_rate,
+        "take_profit_enabled": monitor.take_profit_enabled,
+        "take_profit_first_rise": monitor.take_profit_first_rise,
+        "take_profit_step": monitor.take_profit_step,
+        "take_profit_stage": monitor.take_profit_stage,
+        "take_profit_last_alert_at": (
+            monitor.take_profit_last_alert_at.isoformat() if monitor.take_profit_last_alert_at else None
+        ),
+        "take_profit_rise": take_profit_rise,
+        "next_take_profit_rise": next_take_profit_rise,
+    }
+
+
 async def serialize_monitor_snapshot(monitor: ETFMonitor) -> dict:
     quote: RealtimeQuote | None = None
     try:
@@ -225,6 +262,7 @@ async def serialize_monitor_snapshot(monitor: ETFMonitor) -> dict:
         current_price = latest.close if latest else None
 
     retract_info = await calculate_retract(monitor.code, monitor.time_range, current_price) if current_price else {}
+    position_info = build_position_metrics(monitor, current_price)
     return {
         "id": monitor.id,
         "code": normalize_code(monitor.code),
@@ -244,6 +282,7 @@ async def serialize_monitor_snapshot(monitor: ETFMonitor) -> dict:
         "peak_price": retract_info.get("peak_price"),
         "current_retract": retract_info.get("retract"),
         "range_notice": retract_info.get("message"),
+        **position_info,
         **retract_info,
     }
 
@@ -257,6 +296,7 @@ async def serialize_monitor_list_item(monitor: ETFMonitor) -> dict:
     if latest and previous and previous.close:
         change_percent = (latest.close - previous.close) / previous.close
     retract_info = await calculate_retract(monitor.code, monitor.time_range, current_price) if current_price else {}
+    position_info = build_position_metrics(monitor, current_price)
     return {
         "id": monitor.id,
         "code": normalize_code(monitor.code),
@@ -275,23 +315,24 @@ async def serialize_monitor_list_item(monitor: ETFMonitor) -> dict:
         "peak_price": retract_info.get("peak_price"),
         "current_retract": retract_info.get("retract"),
         "range_notice": retract_info.get("message"),
+        **position_info,
     }
 
 
-async def list_monitor_snapshots(active_only: bool = False) -> list[dict]:
-    query = ETFMonitor.all()
+async def list_monitor_snapshots(user: User, active_only: bool = False) -> list[dict]:
+    query = ETFMonitor.filter(user_id=user.id)
     if active_only:
         query = query.filter(Q(is_active=True))
     monitors = await query.order_by("code")
     return [await serialize_monitor_list_item(monitor) for monitor in monitors]
 
 
-async def get_monitor_or_none(code: str) -> ETFMonitor | None:
-    return await ETFMonitor.filter(code=normalize_code(code)).first()
+async def get_monitor_or_none(code: str, user: User) -> ETFMonitor | None:
+    return await ETFMonitor.filter(code=normalize_code(code), user_id=user.id).first()
 
 
-async def get_detail(code: str) -> dict:
-    monitor = await get_monitor_or_none(code)
+async def get_detail(code: str, user: User) -> dict:
+    monitor = await get_monitor_or_none(code, user)
     if not monitor:
         return {}
 
@@ -306,8 +347,8 @@ async def get_detail(code: str) -> dict:
     }
 
 
-async def list_monitors() -> list[dict]:
-    return await list_monitor_snapshots()
+async def list_monitors(user: User) -> list[dict]:
+    return await list_monitor_snapshots(user)
 
 
 async def ensure_seed_history(monitor: ETFMonitor) -> dict | None:
@@ -327,7 +368,7 @@ async def ensure_seed_history(monitor: ETFMonitor) -> dict | None:
 
 
 async def monitors_for_runtime(code: str | None = None) -> list[ETFMonitor]:
-    query = ETFMonitor.filter(is_active=True).order_by("code")
+    query = ETFMonitor.filter(is_active=True).prefetch_related("user").order_by("code")
     if code:
         query = query.filter(code=normalize_code(code))
     return await query

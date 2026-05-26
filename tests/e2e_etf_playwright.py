@@ -77,7 +77,11 @@ def install_mock_api(page: Page) -> None:
         if path == "/base/access_token" and request.method == "POST":
             return route.fulfill(json=ok({"access_token": "mock-token", "username": body.get("username", "admin")}))
         if path == "/base/userinfo":
-            return route.fulfill(json=ok({"username": "admin"}))
+            return route.fulfill(json=ok({"username": "admin", "email": "admin@example.com"}))
+        if path == "/base/profile" and request.method == "POST":
+            return route.fulfill(json=ok({"username": "admin", "email": body.get("email", "admin@example.com")}))
+        if path == "/base/profile/test-email" and request.method == "POST":
+            return route.fulfill(json=ok({"recipient": "admin@example.com", "subject": "测试邮件发送成功"}))
         if path == "/etf/list" and request.method == "GET":
             return route.fulfill(json=ok(records, total=len(records), page=1, page_size=12))
         if path == "/etf/create" and request.method == "POST":
@@ -186,18 +190,26 @@ def main() -> None:
 
         table, row = first_table_row(page)
         row_buttons = row.locator("button")
-        with page.expect_response(lambda response: "/api/v1/etf/sync" in response.url and response.request.method == "POST"):
-            row_buttons.nth(0).click()
-        expect(row).to_be_visible(timeout=15000)
-
-        row_buttons.nth(1).click()
+        row_buttons.nth(0).click()
         detail_dialog = page.get_by_role("dialog")
         expect(detail_dialog).to_be_visible(timeout=15000)
         expect(detail_dialog.get_by_text("510300")).to_be_visible(timeout=15000)
         expect(detail_dialog.locator(".h-80").first).to_be_visible()
-        expect(detail_dialog.locator(".h-64").first).to_be_visible()
-        expect(detail_dialog.locator("canvas")).to_have_count(2, timeout=15000)
+        expect(detail_dialog.get_by_text("历史行情")).to_have_count(0)
+        expect(detail_dialog.locator("canvas")).to_have_count(1, timeout=15000)
         screenshot(page, screenshot_dir, "04-detail")
+
+        page.goto(f"{args.base_url}/account/profile", wait_until="networkidle")
+        expect(page).to_have_url(f"{args.base_url}/account/profile")
+        profile_section = page.locator("section").first
+        expect(profile_section.locator("input").first).to_have_value("admin", timeout=15000)
+        with page.expect_response(
+            lambda response: "/api/v1/base/profile/test-email" in response.url
+            and response.request.method == "POST"
+        ):
+            profile_section.get_by_role("button", name="测试发送邮件").click()
+        expect(page.get_by_text("测试邮件已发送到")).to_be_visible(timeout=15000)
+        screenshot(page, screenshot_dir, "05-profile-test-email")
 
         browser.close()
 

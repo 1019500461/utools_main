@@ -7,6 +7,7 @@ from tortoise.exceptions import IntegrityError
 from app.common.dependencies import get_current_user
 from app.common.responses import success
 from app.core.security import create_access_token, verify_password
+from app.modules.etf.notification import send_test_notification_email
 from app.modules.role.models import Api, Menu
 from app.modules.role.service import serialize_role, serialize_menu
 from app.modules.user.models import User
@@ -70,6 +71,18 @@ async def update_profile(payload: ProfileUpdateSchema, current_user: User = Depe
             "is_superuser": current_user.is_superuser,
         }
     )
+
+
+@router.post("/profile/test-email")
+async def send_profile_test_email(current_user: User = Depends(get_current_user)):
+    try:
+        result = await send_test_notification_email(current_user)
+    except RuntimeError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail="邮件发送失败") from exc
+
+    return success({"recipient": result.recipient, "subject": result.subject})
 
 
 @router.get("/usermenu")

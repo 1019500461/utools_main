@@ -30,6 +30,11 @@ class ETFMonitorCreate(BaseModel):
     time_range: str = Field(default="3y", pattern="^(3y|5y|all)$")
     x_drop: float = Field(default=0.15, ge=0, le=1)
     y_step: float = Field(default=0.05, ge=0, le=1)
+    holding_cost: float | None = Field(default=None, ge=0)
+    holding_shares: float = Field(default=0, ge=0)
+    take_profit_enabled: bool = False
+    take_profit_first_rise: float = Field(default=0.15, ge=0, le=10)
+    take_profit_step: float = Field(default=0.05, ge=0, le=10)
     is_active: bool = True
 
 
@@ -40,6 +45,11 @@ class ETFMonitorUpdate(BaseModel):
     time_range: str | None = Field(default=None, pattern="^(3y|5y|all)$")
     x_drop: float | None = Field(default=None, ge=0, le=1)
     y_step: float | None = Field(default=None, ge=0, le=1)
+    holding_cost: float | None = Field(default=None, ge=0)
+    holding_shares: float | None = Field(default=None, ge=0)
+    take_profit_enabled: bool | None = None
+    take_profit_first_rise: float | None = Field(default=None, ge=0, le=10)
+    take_profit_step: float | None = Field(default=None, ge=0, le=10)
     is_active: bool | None = None
 
 

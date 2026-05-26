@@ -32,6 +32,12 @@
         <n-form-item label="统计范围" path="time_range">
           <n-select v-model:value="createForm.time_range" :options="timeRangeOptions" />
         </n-form-item>
+        <n-form-item label="持仓成本" path="holding_cost">
+          <n-input-number v-model:value="createForm.holding_cost" :min="0" :precision="4" class="w-full" />
+        </n-form-item>
+        <n-form-item label="持仓份数" path="holding_shares">
+          <n-input-number v-model:value="createForm.holding_shares" :min="0" :precision="2" class="w-full" />
+        </n-form-item>
       </n-form>
       <template #footer>
         <div class="flex justify-end gap-2">
@@ -99,11 +105,49 @@
                   <n-alert v-if="getRangeWarning(detail)" class="mt-3" type="warning" :show-icon="false">
                     {{ getRangeWarning(detail) }}
                   </n-alert>
+                </n-card>
 
-                  <div class="mt-5 flex justify-end">
-                    <n-button type="primary" :loading="savingDetail" @click="saveDetailSettings">保存</n-button>
+                <n-card size="small" title="上涨分批止盈" :bordered="false">
+                  <div class="mb-4 flex items-center justify-between gap-4">
+                    <div>
+                      <p class="font-medium text-slate-900">止盈提醒</p>
+                      <p class="mt-1 text-sm text-slate-500">以每份持仓成本为基准，达到首次涨幅后提醒，之后每上涨一个步长再次提醒。</p>
+                    </div>
+                    <n-switch v-model:value="detailForm.take_profit_enabled" />
+                  </div>
+
+                  <n-form :model="detailForm" label-placement="left" :label-width="116">
+                    <div class="grid gap-3 lg:grid-cols-4">
+                      <n-form-item label="持仓成本">
+                        <n-input-number v-model:value="detailForm.holding_cost" :min="0" :precision="4" class="w-full" />
+                      </n-form-item>
+                      <n-form-item label="持仓份数">
+                        <n-input-number v-model:value="detailForm.holding_shares" :min="0" :precision="2" class="w-full" />
+                      </n-form-item>
+                      <n-form-item label="首次涨幅">
+                        <n-input-number v-model:value="detailForm.take_profit_first_rise_percent" :min="0" :max="1000" :precision="2" class="w-full">
+                          <template #suffix>%</template>
+                        </n-input-number>
+                      </n-form-item>
+                      <n-form-item label="后续步长">
+                        <n-input-number v-model:value="detailForm.take_profit_step_percent" :min="0" :max="1000" :precision="2" class="w-full">
+                          <template #suffix>%</template>
+                        </n-input-number>
+                      </n-form-item>
+                    </div>
+                  </n-form>
+
+                  <div class="mt-2 grid gap-3 text-sm md:grid-cols-4">
+                    <InfoRow label="持仓市值" :value="formatMoney(detail?.market_value)" />
+                    <InfoRow label="浮动盈亏" :value="formatMoney(detail?.floating_profit)" />
+                    <InfoRow label="收益率" :value="formatPercent(detail?.profit_rate)" />
+                    <InfoRow label="下次止盈线" :value="formatPercent(detail?.next_take_profit_rise)" />
                   </div>
                 </n-card>
+
+                <div class="flex justify-end">
+                  <n-button type="primary" :loading="savingDetail" @click="saveDetailSettings">保存</n-button>
+                </div>
               </div>
             </div>
           </n-tab-pane>
@@ -173,6 +217,8 @@ const createForm = reactive({
   code: '',
   name: '',
   time_range: '3y' as EtfTimeRange,
+  holding_cost: null as number | null,
+  holding_shares: 0,
 })
 
 const detailForm = reactive({
@@ -182,6 +228,11 @@ const detailForm = reactive({
   time_range: '3y' as EtfTimeRange,
   x_drop_percent: 15,
   y_step_percent: 5,
+  holding_cost: null as number | null,
+  holding_shares: 0,
+  take_profit_enabled: false,
+  take_profit_first_rise_percent: 15,
+  take_profit_step_percent: 5,
 })
 
 const timeRangeOptions = [
@@ -199,6 +250,18 @@ const columns: DataTableColumns<EtfMonitorRecord> = [
   { title: '编码', key: 'code', width: 140, render: (row) => h('span', { class: 'font-medium text-slate-900' }, row.code) },
   { title: '基金名称', key: 'name', minWidth: 180, render: (row) => row.name || '-' },
   { title: '当前价格', key: 'current_price', width: 140, render: (row) => formatPrice(row.current_price) },
+  { title: '持仓成本', key: 'holding_cost', width: 120, render: (row) => formatPrice(row.holding_cost) },
+  { title: '持仓份数', key: 'holding_shares', width: 120, render: (row) => formatNumber(row.holding_shares) },
+  { title: '持仓市值', key: 'market_value', width: 130, render: (row) => formatMoney(row.market_value) },
+  { title: '浮动盈亏', key: 'floating_profit', width: 130, render: (row) => formatMoney(row.floating_profit) },
+  {
+    title: '收益率',
+    key: 'profit_rate',
+    width: 120,
+    render(row) {
+      return h(NTag, { size: 'small', type: getChangeTagType(row.profit_rate), bordered: false }, { default: () => formatPercent(row.profit_rate) })
+    },
+  },
   {
     title: '今日涨跌幅',
     key: 'change_percent',
@@ -254,7 +317,7 @@ async function loadList() {
 }
 
 function openCreate() {
-  Object.assign(createForm, { code: '', name: '', time_range: '3y' })
+  Object.assign(createForm, { code: '', name: '', time_range: '3y', holding_cost: null, holding_shares: 0 })
   createVisible.value = true
 }
 
@@ -268,6 +331,11 @@ async function saveCreate() {
       time_range: createForm.time_range,
       x_drop: 0.15,
       y_step: 0.05,
+      holding_cost: createForm.holding_cost,
+      holding_shares: createForm.holding_shares,
+      take_profit_enabled: false,
+      take_profit_first_rise: 0.15,
+      take_profit_step: 0.05,
     })
     message.success('新增成功')
     createVisible.value = false
@@ -312,6 +380,11 @@ function fillDetailForm(data: EtfDetailRecord) {
     time_range: data.time_range,
     x_drop_percent: ratioToPercent(data.x_drop),
     y_step_percent: ratioToPercent(data.y_step),
+    holding_cost: data.holding_cost ?? null,
+    holding_shares: data.holding_shares ?? 0,
+    take_profit_enabled: data.take_profit_enabled ?? false,
+    take_profit_first_rise_percent: ratioToPercent(data.take_profit_first_rise),
+    take_profit_step_percent: ratioToPercent(data.take_profit_step),
   })
 }
 
@@ -326,6 +399,11 @@ async function saveDetailSettings() {
       time_range: detailForm.time_range,
       x_drop: percentToRatio(detailForm.x_drop_percent),
       y_step: percentToRatio(detailForm.y_step_percent),
+      holding_cost: detailForm.holding_cost,
+      holding_shares: detailForm.holding_shares,
+      take_profit_enabled: detailForm.take_profit_enabled,
+      take_profit_first_rise: percentToRatio(detailForm.take_profit_first_rise_percent),
+      take_profit_step: percentToRatio(detailForm.take_profit_step_percent),
     })
     message.success('保存成功')
     const res = await api.getEtfDetail({ code: detailForm.code })
@@ -395,6 +473,14 @@ function ratioToPercent(value: number | null | undefined) {
 
 function formatPrice(value?: number | null) {
   return typeof value === 'number' ? value.toFixed(3) : '-'
+}
+
+function formatNumber(value?: number | null) {
+  return typeof value === 'number' ? value.toFixed(2) : '-'
+}
+
+function formatMoney(value?: number | null) {
+  return typeof value === 'number' ? value.toFixed(2) : '-'
 }
 
 function formatPercent(value?: number | null) {

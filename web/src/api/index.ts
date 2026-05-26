@@ -17,6 +17,11 @@ export interface UserInfo {
   is_superuser?: boolean
 }
 
+export interface TestEmailResult {
+  recipient: string
+  subject: string
+}
+
 export interface RoleRecord {
   id: number
   name: string
@@ -58,6 +63,18 @@ export interface EtfMonitorRecord {
   current_price?: number | null
   change_percent?: number | null
   peak_price?: number | null
+  holding_cost?: number | null
+  holding_shares?: number | null
+  market_value?: number | null
+  floating_profit?: number | null
+  profit_rate?: number | null
+  take_profit_enabled?: boolean
+  take_profit_first_rise?: number
+  take_profit_step?: number
+  take_profit_stage?: number
+  take_profit_rise?: number | null
+  next_take_profit_rise?: number | null
+  take_profit_last_alert_at?: string | null
   retract?: number | null
   current_retract?: number | null
   range_warning?: string | null
@@ -96,6 +113,18 @@ export interface EtfDetailRecord {
   current_price?: number | null
   peak_price?: number | null
   trigger_price?: number | null
+  holding_cost?: number | null
+  holding_shares?: number | null
+  market_value?: number | null
+  floating_profit?: number | null
+  profit_rate?: number | null
+  take_profit_enabled?: boolean
+  take_profit_first_rise?: number
+  take_profit_step?: number
+  take_profit_stage?: number
+  take_profit_rise?: number | null
+  next_take_profit_rise?: number | null
+  take_profit_last_alert_at?: string | null
   retract?: number | null
   current_retract?: number | null
   range_warning?: string | null
@@ -113,6 +142,7 @@ export const api = {
     http.post<unknown, ApiResponse<{ access_token: string; username: string }>>('/base/access_token', data),
   getUserInfo: () => http.get<unknown, ApiResponse<UserInfo>>('/base/userinfo'),
   updateProfile: (data: { email: string }) => http.post<unknown, ApiResponse<UserInfo>>('/base/profile', data),
+  testNotificationEmail: () => http.post<unknown, ApiResponse<TestEmailResult>>('/base/profile/test-email'),
   getRoleList: (params: { page: number; page_size: number; role_name?: string }) =>
     http.get<unknown, ApiResponse<RoleRecord[]>>('/role/list', { params }),
   createRole: (data: { name: string; desc: string }) => http.post<unknown, ApiResponse<RoleRecord>>('/role/create', data),
@@ -128,7 +158,18 @@ export const api = {
   updateRoleAuthorized: (data: { id: number; menu_ids: number[]; api_infos: Array<{ path: string; method: string }> }) =>
     http.post<unknown, ApiResponse>('/role/authorized', data),
   getEtfList: () => http.get<unknown, ApiResponse<EtfMonitorRecord[]>>('/etf/list'),
-  createEtf: (data: { code: string; name?: string; time_range: EtfTimeRange; x_drop: number; y_step: number }) =>
+  createEtf: (data: {
+    code: string
+    name?: string
+    time_range: EtfTimeRange
+    x_drop: number
+    y_step: number
+    holding_cost?: number | null
+    holding_shares?: number
+    take_profit_enabled?: boolean
+    take_profit_first_rise?: number
+    take_profit_step?: number
+  }) =>
     http.post<unknown, ApiResponse<EtfMonitorRecord>>('/etf/create', data),
   updateEtf: (data: {
     code: string
@@ -138,6 +179,11 @@ export const api = {
     time_range?: EtfTimeRange
     x_drop?: number
     y_step?: number
+    holding_cost?: number | null
+    holding_shares?: number
+    take_profit_enabled?: boolean
+    take_profit_first_rise?: number
+    take_profit_step?: number
   }) => http.post<unknown, ApiResponse<EtfMonitorRecord>>('/etf/update', data),
   deleteEtf: (params: { code: string }) => http.delete<unknown, ApiResponse>('/etf/delete', { params }),
   getEtfDetail: (params: { code: string }) => http.get<unknown, ApiResponse<EtfDetailRecord>>('/etf/detail', { params }),

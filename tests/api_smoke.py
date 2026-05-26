@@ -41,12 +41,20 @@ def run_etf_smoke(client: httpx.Client, headers: dict[str, str]) -> None:
                 "time_range": "3y",
                 "x_drop": 0.15,
                 "y_step": 0.05,
+                "holding_cost": 1.0,
+                "holding_shares": 1000,
+                "take_profit_enabled": True,
+                "take_profit_first_rise": 0.15,
+                "take_profit_step": 0.05,
                 "is_active": True,
             },
             headers=headers,
         )
     )
     assert created["data"]["monitor"]["code"] == code, created
+    assert created["data"]["monitor"]["holding_cost"] == 1.0, created
+    assert created["data"]["monitor"]["holding_shares"] == 1000, created
+    assert created["data"]["monitor"]["take_profit_enabled"] is True, created
     assert created["data"]["sync"] is None or "error" in created["data"]["sync"], created
 
     listed = assert_ok(client.get("/etf/list", headers=headers))
@@ -59,12 +67,23 @@ def run_etf_smoke(client: httpx.Client, headers: dict[str, str]) -> None:
     updated = assert_ok(
         client.post(
             "/etf/update",
-            json={"code": code, "name": "ETF smoke updated", "time_range": "5y", "is_active": True},
+            json={
+                "code": code,
+                "name": "ETF smoke updated",
+                "time_range": "5y",
+                "holding_cost": 1.2,
+                "holding_shares": 1200,
+                "take_profit_enabled": False,
+                "is_active": True,
+            },
             headers=headers,
         )
     )
     assert updated["data"]["name"] == "ETF smoke updated", updated
     assert updated["data"]["time_range"] == "5y", updated
+    assert updated["data"]["holding_cost"] == 1.2, updated
+    assert updated["data"]["holding_shares"] == 1200, updated
+    assert updated["data"]["take_profit_enabled"] is False, updated
 
     synced = assert_ok(client.post("/etf/sync", json={"code": code}, headers=headers))
     assert synced["data"] and synced["data"][0]["code"] == code, synced

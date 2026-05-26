@@ -3,10 +3,17 @@ from __future__ import annotations
 import asyncio
 import html
 import smtplib
+from dataclasses import dataclass
 from email.message import EmailMessage
 
 from app.core.config import settings
 from app.modules.user.models import User
+
+
+@dataclass(frozen=True)
+class EmailSendResult:
+    recipient: str
+    subject: str
 
 
 def build_strategy_email(code: str, stage: int, price: float, retract: float) -> tuple[str, str]:
@@ -48,7 +55,50 @@ def build_strategy_email(code: str, stage: int, price: float, retract: float) ->
     return subject, body
 
 
-async def _resolve_recipient_email() -> str:
+def build_take_profit_email(code: str, stage: int, price: float, rise: float, holding_cost: float) -> tuple[str, str]:
+    subject = "【量化策略】上涨分批止盈提醒"
+    safe_code = html.escape(code)
+    body = f"""
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    body {{ margin: 0; background: #f6f7f9; color: #1f2937; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }}
+    .wrap {{ max-width: 560px; margin: 0 auto; padding: 24px 16px; }}
+    .panel {{ background: #ffffff; border: 1px solid #e5e7eb; border-radius: 8px; padding: 20px; }}
+    .title {{ margin: 0 0 12px; font-size: 18px; font-weight: 700; }}
+    .text {{ margin: 0 0 16px; line-height: 1.7; font-size: 14px; }}
+    .grid {{ display: grid; gap: 10px; }}
+    .item {{ padding: 12px; background: #f9fafb; border-radius: 6px; }}
+    .label {{ color: #6b7280; font-size: 12px; }}
+    .value {{ margin-top: 4px; font-size: 16px; font-weight: 700; }}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="panel">
+      <h1 class="title">上涨分批止盈提醒</h1>
+      <p class="text">您关注的标的（{safe_code}）已达到第 {stage} 次上涨分批止盈提醒。</p>
+      <div class="grid">
+        <div class="item"><div class="label">标的代码</div><div class="value">{safe_code}</div></div>
+        <div class="item"><div class="label">当前价格</div><div class="value">{price:.4f}</div></div>
+        <div class="item"><div class="label">每份持仓成本</div><div class="value">{holding_cost:.4f}</div></div>
+        <div class="item"><div class="label">相对成本涨幅</div><div class="value">{rise:.2%}</div></div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
+"""
+    return subject, body
+
+
+async def _resolve_recipient_email(preferred_user: User | None = None) -> str:
+    if preferred_user and preferred_user.email:
+        return preferred_user.email
+
     user = await User.filter(is_active=True, is_superuser=True).exclude(email="").order_by("id").first()
     if not user:
         user = await User.filter(is_active=True).exclude(email="").order_by("id").first()
@@ -79,7 +129,68 @@ def _send_email(subject: str, body: str, recipient: str) -> None:
             server.send_message(message)
 
 
-async def send_strategy_notification(code: str, stage: int, price: float, retract: float) -> None:
+def build_test_email(username: str) -> tuple[str, str]:
+    subject = "测试邮件发送成功"
+    safe_username = html.escape(username)
+    body = f"""
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    body {{ margin: 0; background: #f6f7f9; color: #1f2937; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }}
+    .wrap {{ max-width: 560px; margin: 0 auto; padding: 24px 16px; }}
+    .panel {{ background: #ffffff; border: 1px solid #e5e7eb; border-radius: 8px; padding: 20px; }}
+    .title {{ margin: 0 0 12px; font-size: 18px; font-weight: 700; }}
+    .text {{ margin: 0 0 12px; line-height: 1.7; font-size: 14px; }}
+    .note {{ margin: 16px 0 0; color: #6b7280; font-size: 13px; line-height: 1.6; }}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="panel">
+      <h1 class="title">测试邮件发送成功</h1>
+      <p class="text">你好，{safe_username}。</p>
+      <p class="text">这是一封用于验证当前账号邮箱通知能力的测试邮件。</p>
+      <p class="note">如果你收到了这封邮件，说明系统邮件发送链路可以正常到达你的邮箱。</p>
+    </div>
+  </div>
+</body>
+</html>
+"""
+    return subject, body
+
+
+async def send_strategy_notification(
+    code: str,
+    stage: int,
+    price: float,
+    retract: float,
+    user: User | None = None,
+) -> EmailSendResult:
     subject, body = build_strategy_email(code, stage, price, retract)
-    recipient = await _resolve_recipient_email()
+    recipient = await _resolve_recipient_email(user)
     await asyncio.to_thread(_send_email, subject, body, recipient)
+    return EmailSendResult(recipient=recipient, subject=subject)
+
+
+async def send_take_profit_notification(
+    code: str,
+    stage: int,
+    price: float,
+    rise: float,
+    holding_cost: float,
+    user: User | None = None,
+) -> EmailSendResult:
+    subject, body = build_take_profit_email(code, stage, price, rise, holding_cost)
+    recipient = await _resolve_recipient_email(user)
+    await asyncio.to_thread(_send_email, subject, body, recipient)
+    return EmailSendResult(recipient=recipient, subject=subject)
+
+
+async def send_test_notification_email(user: User) -> EmailSendResult:
+    subject, body = build_test_email(user.username)
+    recipient = await _resolve_recipient_email(user)
+    await asyncio.to_thread(_send_email, subject, body, recipient)
+    return EmailSendResult(recipient=recipient, subject=subject)

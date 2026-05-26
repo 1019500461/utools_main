@@ -20,7 +20,8 @@
           </n-form-item>
         </n-form>
 
-        <div class="mt-4 flex justify-end">
+        <div class="mt-4 flex justify-end gap-2">
+          <n-button :loading="testingEmail" @click="testEmail">测试发送邮件</n-button>
           <n-button type="primary" :loading="saving" @click="saveProfile">保存</n-button>
         </div>
       </n-spin>
@@ -37,6 +38,7 @@ import { api } from '../api'
 const message = useMessage()
 const loading = ref(false)
 const saving = ref(false)
+const testingEmail = ref(false)
 
 const form = reactive({
   username: '',
@@ -66,6 +68,16 @@ async function saveProfile() {
     message.success('通知邮箱已保存')
   } finally {
     saving.value = false
+  }
+}
+
+async function testEmail() {
+  testingEmail.value = true
+  try {
+    const res = await api.testNotificationEmail()
+    message.success(`测试邮件已发送到 ${res.data.recipient}`)
+  } finally {
+    testingEmail.value = false
   }
 }
 </script>

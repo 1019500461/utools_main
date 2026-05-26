@@ -2,6 +2,7 @@ from tortoise import Tortoise
 
 from app.core.config import settings
 from app.core.security import hash_password
+from app.modules.etf.schema_maintenance import ensure_etf_schema
 from app.modules.role.models import Api, Menu, Role
 from app.modules.user.models import User
 
@@ -20,6 +21,7 @@ ROLE_API_DEFINITIONS = [
 async def init_database() -> None:
     await Tortoise.init(config=settings.tortoise_orm)
     await Tortoise.generate_schemas(safe=True)
+    await ensure_etf_schema()
     await init_seed_data()
 
 
