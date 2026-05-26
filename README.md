@@ -124,22 +124,21 @@ Render 里需要配置的环境变量：
 ```text
 DATABASE_URL=postgres://USER:URL_ENCODED_PASSWORD@HOST:5432/postgres?sslmode=verify-full
 DATABASE_SSL_ROOT_CERT=Supabase Root CA 证书内容
-CORS_ORIGINS=["https://utools-main-web.pages.dev","http://localhost:5173","http://127.0.0.1:5173"]
-JWT_ACCESS_TOKEN_EXPIRE_MINUTES=10080
-SECRET_KEY=Render Blueprint 可自动生成；手动配置时必须使用生产随机密钥
 ```
+
+`SECRET_KEY`、`JWT_ACCESS_TOKEN_EXPIRE_MINUTES`、`CORS_ORIGINS`、`PYTHON_VERSION` 已在 `render.yaml` 中配置。`SECRET_KEY` 使用 Render Blueprint 自动生成，不要手写进仓库。
 
 基金/ETF 邮件提醒还需要 SMTP 发件配置：
 
 ```text
 SMTP_HOST=smtp.xxx.com
-SMTP_PORT=587
 SMTP_USER=your-sender@example.com
 SMTP_PASSWORD=邮箱 SMTP 授权码或密码
 SMTP_FROM=your-sender@example.com
-SMTP_TLS=true
 SMTP_TO=fallback-recipient@example.com
 ```
+
+`SMTP_PORT=587` 和 `SMTP_TLS=true` 已在 `render.yaml` 中配置，一般不用改。
 
 说明：
 
@@ -149,6 +148,8 @@ SMTP_TO=fallback-recipient@example.com
 - `SMTP_TO` 是兜底接收邮箱；当系统里没有可用用户邮箱时才会使用。
 - Render 不是 VPS，不需要 SSH 上去 `git pull`。
 - 访问后端根路径 `/` 返回 `404 Not Found` 是正常的，当前后端只提供 API 和 `/health`。
+
+如果使用 Render MCP 或 API 批量设置环境变量，仍然不要把真实密钥写入命令历史、README 或提交记录。当前仓库的简化方式是：变量名和默认值写在 `render.yaml`，敏感值只在 Render Dashboard 填。
 
 ### 1.2 Supabase 数据库
 
