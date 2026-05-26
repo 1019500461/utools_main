@@ -54,15 +54,29 @@
             <div class="grid gap-5 lg:grid-cols-[260px_1fr]">
               <aside class="border-r border-slate-100 pr-4">
                 <div class="space-y-2 text-sm text-slate-500">
-                  <p class="rounded bg-slate-100 px-3 py-2 font-medium text-slate-900">基金回撤提醒</p>
-                  <p class="px-3 py-2">趋势反转提醒</p>
-                  <p class="px-3 py-2">下跌抄底提醒</p>
-                  <p class="px-3 py-2">上涨分批止盈</p>
+                  <button
+                    type="button"
+                    class="w-full rounded px-3 py-2 text-left transition"
+                    :class="getReminderNavClass('drawdown')"
+                    @click="activeReminder = 'drawdown'"
+                  >
+                    基金回撤提醒
+                  </button>
+                  <p class="px-3 py-2 text-slate-400">趋势反转提醒</p>
+                  <p class="px-3 py-2 text-slate-400">下跌抄底提醒</p>
+                  <button
+                    type="button"
+                    class="w-full rounded px-3 py-2 text-left transition"
+                    :class="getReminderNavClass('takeProfit')"
+                    @click="activeReminder = 'takeProfit'"
+                  >
+                    上涨分批止盈
+                  </button>
                 </div>
               </aside>
 
               <div class="space-y-5">
-                <div class="flex items-start justify-between gap-4">
+                <div v-if="activeReminder === 'drawdown'" class="flex items-start justify-between gap-4">
                   <div>
                     <h2 class="text-lg font-semibold text-slate-900">基金回撤提醒</h2>
                     <p class="mt-2 max-w-3xl text-sm leading-6 text-slate-500">
@@ -72,11 +86,21 @@
                   <n-switch v-model:value="detailForm.is_active" />
                 </div>
 
-                <n-card size="small" title="历史 K 线" :bordered="false">
+                <div v-else class="flex items-start justify-between gap-4">
+                  <div>
+                    <h2 class="text-lg font-semibold text-slate-900">上涨分批止盈</h2>
+                    <p class="mt-2 max-w-3xl text-sm leading-6 text-slate-500">
+                      以每份持仓成本为基准，达到首次涨幅后提醒，之后每上涨一个步长再次提醒。
+                    </p>
+                  </div>
+                  <n-switch v-model:value="detailForm.take_profit_enabled" />
+                </div>
+
+                <n-card v-if="activeReminder === 'drawdown'" size="small" title="历史 K 线" :bordered="false">
                   <div ref="klineRef" class="h-80 w-full" data-testid="etf-kline-chart"></div>
                 </n-card>
 
-                <n-card size="small" title="参数设置" :bordered="false">
+                <n-card v-if="activeReminder === 'drawdown'" size="small" title="参数设置" :bordered="false">
                   <n-form :model="detailForm" label-placement="left" :label-width="104">
                     <div class="grid gap-3 lg:grid-cols-3">
                       <n-form-item label="统计周期">
@@ -107,15 +131,7 @@
                   </n-alert>
                 </n-card>
 
-                <n-card size="small" title="上涨分批止盈" :bordered="false">
-                  <div class="mb-4 flex items-center justify-between gap-4">
-                    <div>
-                      <p class="font-medium text-slate-900">止盈提醒</p>
-                      <p class="mt-1 text-sm text-slate-500">以每份持仓成本为基准，达到首次涨幅后提醒，之后每上涨一个步长再次提醒。</p>
-                    </div>
-                    <n-switch v-model:value="detailForm.take_profit_enabled" />
-                  </div>
-
+                <n-card v-if="activeReminder === 'takeProfit'" size="small" title="参数设置" :bordered="false">
                   <n-form :model="detailForm" label-placement="left" :label-width="116">
                     <div class="grid gap-3 lg:grid-cols-4">
                       <n-form-item label="持仓成本">
@@ -211,6 +227,7 @@ const detailLoading = ref(false)
 const detail = ref<EtfDetailRecord | null>(null)
 const createFormRef = ref<FormInst | null>(null)
 const klineRef = ref<HTMLDivElement | null>(null)
+const activeReminder = ref<'drawdown' | 'takeProfit'>('drawdown')
 let klineChart: echarts.ECharts | null = null
 
 const createForm = reactive({
@@ -360,6 +377,7 @@ async function openDetail(row: EtfMonitorRecord) {
   detailVisible.value = true
   detailLoading.value = true
   detail.value = null
+  activeReminder.value = 'drawdown'
   disposeCharts()
   try {
     const res = await api.getEtfDetail({ code: row.code })
@@ -461,6 +479,10 @@ function getRetract(row?: EtfMonitorRecord | EtfDetailRecord | null) {
 
 function getRangeWarning(row?: EtfMonitorRecord | EtfDetailRecord | null) {
   return row?.range_warning || row?.range_notice || null
+}
+
+function getReminderNavClass(name: 'drawdown' | 'takeProfit') {
+  return activeReminder.value === name ? 'bg-slate-100 font-medium text-slate-900' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900'
 }
 
 function percentToRatio(value: number | null) {

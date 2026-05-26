@@ -172,6 +172,8 @@ def main() -> None:
         expect(table).to_be_visible(timeout=15000)
         expect(row).to_be_visible(timeout=15000)
         expect(table.get_by_text("159915")).to_be_visible()
+        expect(table.get_by_text("持仓成本")).to_be_visible()
+        expect(table.get_by_text("收益率")).to_be_visible()
         screenshot(page, screenshot_dir, "02-etf-list")
 
         header_buttons = page.locator("section").first.locator("> div").first.locator("button")
@@ -184,6 +186,8 @@ def main() -> None:
         expect(create_dialog).to_be_visible(timeout=15000)
         create_dialog.locator("input").nth(0).fill("588000")
         create_dialog.locator("input").nth(1).fill("Science ETF")
+        create_dialog.locator(".n-form-item").filter(has_text="持仓成本").locator("input").fill("1.2340")
+        create_dialog.locator(".n-form-item").filter(has_text="持仓份数").locator("input").fill("2000")
         create_dialog.locator("button").last.click()
         expect(table.get_by_text("588000")).to_be_visible(timeout=15000)
         screenshot(page, screenshot_dir, "03-created")
@@ -197,6 +201,10 @@ def main() -> None:
         expect(detail_dialog.locator(".h-80").first).to_be_visible()
         expect(detail_dialog.get_by_text("历史行情")).to_have_count(0)
         expect(detail_dialog.locator("canvas")).to_have_count(1, timeout=15000)
+        detail_dialog.get_by_role("button", name="上涨分批止盈").click()
+        expect(detail_dialog.get_by_role("heading", name="上涨分批止盈")).to_be_visible(timeout=15000)
+        expect(detail_dialog.get_by_text("下次止盈线")).to_be_visible(timeout=15000)
+        expect(detail_dialog.get_by_text("回撤阈值")).to_have_count(0)
         screenshot(page, screenshot_dir, "04-detail")
 
         page.goto(f"{args.base_url}/account/profile", wait_until="networkidle")
