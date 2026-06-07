@@ -27,9 +27,10 @@ async def list_role(
 
 @router.post("/role/create")
 async def create_role(role_in: RoleCreate, _: User = Depends(get_current_user)):
-    if await Role.filter(name=role_in.name).exists():
+    name = role_in.name.strip()
+    if await Role.filter(name=name).exists():
         raise HTTPException(status_code=400, detail="角色名称已存在")
-    role = await Role.create(name=role_in.name, desc=role_in.desc)
+    role = await Role.create(name=name, desc=role_in.desc)
     return success(await serialize_role(role), msg="Created Successfully")
 
 
@@ -38,10 +39,11 @@ async def update_role(role_in: RoleUpdate, _: User = Depends(get_current_user)):
     role = await Role.filter(id=role_in.id).first()
     if not role:
         raise HTTPException(status_code=404, detail="角色不存在")
-    exists = await Role.filter(name=role_in.name).exclude(id=role_in.id).exists()
+    name = role_in.name.strip()
+    exists = await Role.filter(name=name).exclude(id=role_in.id).exists()
     if exists:
         raise HTTPException(status_code=400, detail="角色名称已存在")
-    role.name = role_in.name
+    role.name = name
     role.desc = role_in.desc
     await role.save(update_fields=["name", "desc", "updated_at"])
     return success(await serialize_role(role), msg="Updated Successfully")

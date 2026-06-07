@@ -13,8 +13,10 @@ export interface UserInfo {
   id?: number
   username: string
   email: string
+  avatar?: string
   is_active?: boolean
   is_superuser?: boolean
+  roles?: RoleRecord[]
 }
 
 export interface TestEmailResult {
@@ -28,6 +30,18 @@ export interface RoleRecord {
   desc: string
   created_at?: string
   updated_at?: string
+}
+
+export interface UserRecord {
+  id: number
+  username: string
+  email: string
+  is_active: boolean
+  is_superuser: boolean
+  last_login?: string | null
+  created_at?: string
+  updated_at?: string
+  roles: RoleRecord[]
 }
 
 export interface MenuRecord {
@@ -141,8 +155,31 @@ export const api = {
   login: (data: { username: string; password: string }) =>
     http.post<unknown, ApiResponse<{ access_token: string; username: string }>>('/base/access_token', data),
   getUserInfo: () => http.get<unknown, ApiResponse<UserInfo>>('/base/userinfo'),
-  updateProfile: (data: { email: string }) => http.post<unknown, ApiResponse<UserInfo>>('/base/profile', data),
+  updateProfile: (data: { username: string; email: string }) => http.post<unknown, ApiResponse<UserInfo>>('/base/profile', data),
+  updatePassword: (data: { old_password: string; new_password: string; confirm_password: string }) =>
+    http.post<unknown, ApiResponse>('/base/update_password', data),
   testNotificationEmail: () => http.post<unknown, ApiResponse<TestEmailResult>>('/base/profile/test-email'),
+  getUserList: (params: { page: number; page_size: number; username?: string; email?: string }) =>
+    http.get<unknown, ApiResponse<UserRecord[]>>('/user/list', { params }),
+  getUserById: (params: { user_id: number }) => http.get<unknown, ApiResponse<UserRecord>>('/user/get', { params }),
+  createUser: (data: {
+    username: string
+    email: string
+    password: string
+    role_ids: number[]
+    is_active: boolean
+    is_superuser: boolean
+  }) => http.post<unknown, ApiResponse<UserRecord>>('/user/create', data),
+  updateUser: (data: {
+    id: number
+    username: string
+    email: string
+    role_ids: number[]
+    is_active: boolean
+    is_superuser: boolean
+  }) => http.post<unknown, ApiResponse<UserRecord>>('/user/update', data),
+  deleteUser: (params: { user_id: number }) => http.delete<unknown, ApiResponse>('/user/delete', { params }),
+  resetPassword: (data: { user_id: number }) => http.post<unknown, ApiResponse>('/user/reset_password', data),
   getRoleList: (params: { page: number; page_size: number; role_name?: string }) =>
     http.get<unknown, ApiResponse<RoleRecord[]>>('/role/list', { params }),
   createRole: (data: { name: string; desc: string }) => http.post<unknown, ApiResponse<RoleRecord>>('/role/create', data),

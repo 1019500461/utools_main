@@ -10,6 +10,7 @@ from app.db.session import close_database, init_database
 from app.modules.etf.api import router as etf_router
 from app.modules.etf.monitor import start_scheduler, stop_scheduler
 from app.modules.role.api import router as role_router
+from app.modules.user.admin_api import router as user_admin_router
 from app.modules.user.api import router as user_router
 
 
@@ -31,6 +32,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 app.include_router(user_router)
+app.include_router(user_admin_router)
 app.include_router(role_router)
 app.include_router(etf_router)
 

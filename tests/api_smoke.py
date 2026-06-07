@@ -30,6 +30,89 @@ def mock_etf_code() -> str:
     return f"MOCK{letters}"
 
 
+def run_admin_smoke(client: httpx.Client, headers: dict[str, str]) -> None:
+    username = f"smoke-{uuid4().hex[:8]}"
+    email = f"{username}@example.com"
+
+    roles = assert_ok(client.get("/role/list", params={"page": 1, "page_size": 100}, headers=headers))["data"]
+    role_ids = [roles[0]["id"]] if roles else []
+
+    created_user = assert_ok(
+        client.post(
+            "/user/create",
+            json={
+                "username": username,
+                "email": email,
+                "password": "123456",
+                "role_ids": role_ids,
+                "is_active": True,
+                "is_superuser": False,
+            },
+            headers=headers,
+        )
+    )["data"]
+    user_id = created_user["id"]
+
+    listed_users = assert_ok(
+        client.get("/user/list", params={"page": 1, "page_size": 10, "username": username}, headers=headers)
+    )["data"]
+    assert any(item["id"] == user_id for item in listed_users), listed_users
+
+    updated_email = f"{username}-updated@example.com"
+    assert_ok(
+        client.post(
+            "/user/update",
+            json={
+                "id": user_id,
+                "username": username,
+                "email": updated_email,
+                "role_ids": role_ids,
+                "is_active": True,
+                "is_superuser": False,
+            },
+            headers=headers,
+        )
+    )
+    user_detail = assert_ok(client.get("/user/get", params={"user_id": user_id}, headers=headers))["data"]
+    assert user_detail["email"] == updated_email, user_detail
+
+    assert_ok(client.post("/user/reset_password", json={"user_id": user_id}, headers=headers))
+    bad_password = client.post(
+        "/base/update_password",
+        json={"old_password": "wrong-password", "new_password": "654321", "confirm_password": "654321"},
+        headers=headers,
+    )
+    assert bad_password.status_code == 400, bad_password.text
+
+    assert_ok(client.delete("/user/delete", params={"user_id": user_id}, headers=headers))
+
+
+def run_role_smoke(client: httpx.Client, headers: dict[str, str]) -> None:
+    role_name = f"测试角色-{uuid4().hex[:8]}"
+    created = assert_ok(client.post("/role/create", json={"name": role_name, "desc": "api smoke"}, headers=headers))
+    role_id = created["data"]["id"]
+
+    listed = assert_ok(client.get("/role/list", params={"page": 1, "page_size": 10, "role_name": role_name}, headers=headers))
+    assert any(item["id"] == role_id for item in listed["data"]), listed
+
+    assert_ok(client.post("/role/update", json={"id": role_id, "name": role_name, "desc": "api smoke updated"}, headers=headers))
+
+    menus = assert_ok(client.get("/menu/list", headers=headers))["data"]
+    apis = assert_ok(client.get("/api/list", headers=headers))["data"]
+    api_infos = [{"path": item["path"], "method": item["method"]} for item in apis if item["method"] == "GET"]
+    assert_ok(
+        client.post(
+            "/role/authorized",
+            json={"id": role_id, "menu_ids": [item["id"] for item in menus], "api_infos": api_infos},
+            headers=headers,
+        )
+    )
+    authorized = assert_ok(client.get("/role/authorized", params={"id": role_id}, headers=headers))["data"]
+    assert authorized["menus"], authorized
+
+    assert_ok(client.delete("/role/delete", params={"role_id": role_id}, headers=headers))
+
+
 def run_etf_smoke(client: httpx.Client, headers: dict[str, str]) -> None:
     code = mock_etf_code()
     created = assert_ok(
@@ -96,7 +179,7 @@ def run_etf_smoke(client: httpx.Client, headers: dict[str, str]) -> None:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Smoke test login and role management APIs.")
+    parser = argparse.ArgumentParser(description="Smoke test login, admin and ETF APIs.")
     parser.add_argument("--api-url", default="http://127.0.0.1:8000/api/v1")
     parser.add_argument("--username", default="admin")
     parser.add_argument("--password", default="123456")
@@ -114,30 +197,8 @@ def main() -> None:
         assert_ok(client.get("/base/userinfo", headers=headers))
         assert_ok(client.get("/base/usermenu", headers=headers))
         assert_ok(client.get("/base/userapi", headers=headers))
-
-        role_name = f"测试角色-{uuid4().hex[:8]}"
-        created = assert_ok(client.post("/role/create", json={"name": role_name, "desc": "api smoke"}, headers=headers))
-        role_id = created["data"]["id"]
-
-        listed = assert_ok(client.get("/role/list", params={"page": 1, "page_size": 10, "role_name": role_name}, headers=headers))
-        assert any(item["id"] == role_id for item in listed["data"]), listed
-
-        assert_ok(client.post("/role/update", json={"id": role_id, "name": role_name, "desc": "api smoke updated"}, headers=headers))
-
-        menus = assert_ok(client.get("/menu/list", headers=headers))["data"]
-        apis = assert_ok(client.get("/api/list", headers=headers))["data"]
-        api_infos = [{"path": item["path"], "method": item["method"]} for item in apis if item["method"] == "GET"]
-        assert_ok(
-            client.post(
-                "/role/authorized",
-                json={"id": role_id, "menu_ids": [item["id"] for item in menus], "api_infos": api_infos},
-                headers=headers,
-            )
-        )
-        authorized = assert_ok(client.get("/role/authorized", params={"id": role_id}, headers=headers))["data"]
-        assert authorized["menus"], authorized
-
-        assert_ok(client.delete("/role/delete", params={"role_id": role_id}, headers=headers))
+        run_admin_smoke(client, headers)
+        run_role_smoke(client, headers)
 
         if not args.skip_etf:
             run_etf_smoke(client, headers)
