@@ -12,11 +12,13 @@
     </div>
 
     <n-card :bordered="false" class="mb-4">
-      <div class="flex flex-wrap items-center gap-4">
-        <span class="font-medium text-slate-700">角色名</span>
-        <n-input v-model:value="query.role_name" clearable class="max-w-xs" placeholder="请输入角色名" @keyup.enter="loadRoles" />
-        <n-button @click="resetQuery">重置</n-button>
-        <n-button type="error" @click="loadRoles">搜索</n-button>
+      <div class="grid grid-cols-1 items-center gap-4 lg:grid-cols-[auto_280px_1fr]">
+        <span class="whitespace-nowrap font-medium text-slate-700">角色名</span>
+        <n-input v-model:value="query.role_name" clearable placeholder="请输入角色名" @keyup.enter="loadRoles" />
+        <div class="flex justify-start gap-3 lg:justify-end">
+          <n-button @click="resetQuery">重置</n-button>
+          <n-button type="error" @click="loadRoles">搜索</n-button>
+        </div>
       </div>
     </n-card>
 

@@ -12,13 +12,15 @@
     </div>
 
     <n-card :bordered="false" class="mb-4">
-      <div class="flex flex-wrap items-center gap-4">
-        <span class="font-medium text-slate-700">名称</span>
-        <n-input v-model:value="query.username" clearable class="max-w-xs" placeholder="请输入用户名称" @keyup.enter="loadUsers" />
-        <span class="font-medium text-slate-700">邮箱</span>
-        <n-input v-model:value="query.email" clearable class="max-w-xs" placeholder="请输入邮箱" @keyup.enter="loadUsers" />
-        <n-button @click="resetQuery">重置</n-button>
-        <n-button type="error" @click="loadUsers">搜索</n-button>
+      <div class="grid grid-cols-1 items-center gap-4 lg:grid-cols-[auto_280px_auto_280px_1fr]">
+        <span class="whitespace-nowrap font-medium text-slate-700">名称</span>
+        <n-input v-model:value="query.username" clearable placeholder="请输入用户名称" @keyup.enter="loadUsers" />
+        <span class="whitespace-nowrap font-medium text-slate-700">邮箱</span>
+        <n-input v-model:value="query.email" clearable placeholder="请输入邮箱" @keyup.enter="loadUsers" />
+        <div class="flex justify-start gap-3 lg:justify-end">
+          <n-button @click="resetQuery">重置</n-button>
+          <n-button type="error" @click="loadUsers">搜索</n-button>
+        </div>
       </div>
     </n-card>
 
