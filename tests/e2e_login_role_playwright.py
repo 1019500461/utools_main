@@ -191,7 +191,7 @@ def main() -> None:
         if args.mock_api:
             install_mock_api(page)
 
-        page.goto(f"{args.base_url}/system/user", wait_until="networkidle")
+        page.goto(f"{args.base_url}/system/user", wait_until="domcontentloaded")
         expect(page).to_have_url(re.compile(r"/login"))
         screenshot(page, screenshot_dir, "01-login")
 
@@ -216,16 +216,23 @@ def main() -> None:
         table = page.locator(".n-data-table")
         expect(table.get_by_role("cell", name=user_name, exact=True)).to_be_visible(timeout=15000)
 
-        table.get_by_role("button", name="编辑").click()
+        user_row = table.get_by_role("row").filter(has_text=user_name)
+        user_row.get_by_role("button", name="编辑").click()
         dialog = page.get_by_role("dialog")
         dialog.get_by_placeholder("请输入邮箱").fill(f"{user_name}-updated@example.com")
         dialog.get_by_role("button", name="保存").click()
         expect(dialog).to_be_hidden(timeout=15000)
         expect(page.get_by_text(f"{user_name}-updated@example.com")).to_be_visible(timeout=15000)
 
-        table.get_by_role("button", name="重置密码").click()
+        user_row = table.get_by_role("row").filter(has_text=user_name)
+        user_row.get_by_role("button", name="重置密码").click()
         page.get_by_role("button", name="确定").click()
         expect(page.get_by_text("密码已重置为 123456")).to_be_visible(timeout=15000)
+
+        user_row = page.locator(".n-data-table").get_by_role("row").filter(has_text=user_name)
+        user_row.get_by_role("button", name="删除").click()
+        page.locator(".n-popconfirm").filter(has_text=user_name).get_by_role("button", name="确定").click()
+        expect(page.locator(".n-data-table").get_by_role("cell", name=user_name, exact=True)).to_be_hidden(timeout=15000)
 
         page.get_by_text("个人中心").click()
         expect(page.get_by_role("heading", name="个人中心")).to_be_visible(timeout=15000)
@@ -255,22 +262,25 @@ def main() -> None:
         expect(page.get_by_text(role_name)).to_be_visible(timeout=15000)
 
         table = page.locator(".n-data-table")
-        table.get_by_role("button", name="编辑").click()
+        role_row = table.get_by_role("row").filter(has_text=role_name)
+        role_row.get_by_role("button", name="编辑").click()
         dialog = page.get_by_role("dialog")
         dialog.get_by_placeholder("请输入角色描述").fill("playwright smoke updated")
         dialog.get_by_role("button", name="保存").click()
         expect(dialog).to_be_hidden(timeout=15000)
         expect(page.get_by_text("playwright smoke updated")).to_be_visible(timeout=15000)
 
-        table.get_by_role("button", name="设置权限").click()
+        role_row = table.get_by_role("row").filter(has_text=role_name)
+        role_row.get_by_role("button", name="设置权限").click()
         expect(page.get_by_text("菜单权限", exact=True)).to_be_visible(timeout=15000)
         expect(page.get_by_text("接口权限", exact=True)).to_be_visible()
         screenshot(page, screenshot_dir, "04-authorized-drawer")
         page.get_by_role("button", name="确定").click()
         expect(page.get_by_text("权限保存成功")).to_be_visible(timeout=15000)
 
-        page.get_by_role("button", name="删除").first.click()
-        page.get_by_role("button", name="确定").click()
+        role_row = page.locator(".n-data-table").get_by_role("row").filter(has_text=role_name)
+        role_row.get_by_role("button", name="删除").click()
+        page.locator(".n-popconfirm").filter(has_text=role_name).get_by_role("button", name="确定").click()
         expect(page.get_by_text("No Data")).to_be_visible(timeout=15000)
 
         page.get_by_role("button", name="admin").click()
